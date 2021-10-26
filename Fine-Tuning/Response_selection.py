@@ -36,12 +36,13 @@ parser.add_argument("--learning_rate",
                     default=1e-5,
                     type=float,
                     help="The initial learning rate for Adamw.")
-parser.add_argument("--epochs",
+parser.add_argument("--epochs", 
                     default=2,
                     type=float,
                     help="Total number of training epochs to perform.")
 parser.add_argument("--save_path",
-                    default="./Fine-Tuning/FT_checkpoint/",
+                    # default="./Fine-Tuning/FT_checkpoint/",
+                    default="./fine-tune/",
                     type=str,
                     help="The path to save model.")
 parser.add_argument("--score_file_path",
@@ -75,6 +76,9 @@ if __name__ == '__main__':
     start = time.time()
     with open(FT_data[args.task], 'rb') as f:
         train, dev, test = pickle.load(f, encoding='ISO-8859-1')
+
+    import IPython
+    IPython.embed()
 
     if args.is_training==True:
         train_model(train,dev)
