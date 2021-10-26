@@ -52,8 +52,7 @@ parser.add_argument("--score_file_path",
 parser.add_argument("--do_lower_case", action='store_true', default=True,
                     help="Set this flag if you are using an uncased model.")
 args = parser.parse_args()
-## TODO: I commented this because the path seems wrong. Replaced with hardcoded load below. args.save_path += args.task + '.' + "0.pt"
-args.save_path = "./post-train/ubuntu25/bert.pt"
+args.save_path += args.task + '.' + "0.pt"
 args.score_file_path = args.score_file_path
 # load bert
 
