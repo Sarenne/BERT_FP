@@ -159,7 +159,8 @@ class NeuralNetwork(nn.Module):
 
         self.bert_model.resize_token_embeddings(len(self.bert_tokenizer))
         """You can load the post-trained checkpoint here."""
-        self.bert_model.bert.load_state_dict(state_dict=torch.load("./FPT/PT_checkpoint/ubuntu25/bert.pt"))
+        self.bert_model.bert.load_state_dict(state_dict=torch.load("./post-train/ubuntu25/bert.pt"))
+        # self.bert_model.bert.load_state_dict(state_dict=torch.load("./FPT/PT_checkpoint/ubuntu25/bert.pt"))
         #self.bert_model.bert.load_state_dict(state_dict=torch.load("./FPT/PT_checkpoint/douban27/bert.pt"))
         #self.bert_model.bert.load_state_dict(state_dict=torch.load("./FPT/PT_checkpoint/e_commerce34/bert.pt"))
         
@@ -275,7 +276,7 @@ class NeuralNetwork(nn.Module):
         dataset = BERTDataset(self.args, dev,self.bert_tokenizer)
         dataloader = DataLoader(dataset, batch_size=400)
 
-        for i, data in enumerate(dataloader):
+        for i, data in tqdm(enumerate(dataloader), desc="Prediction dataloader"):
             with torch.no_grad():
                 batch_ids, batch_mask, batch_seg, batch_y, batch_len = (item.cuda() for item in data)
             with torch.no_grad():
@@ -288,6 +289,6 @@ class NeuralNetwork(nn.Module):
         return y_pred
 
     def load_model(self, path):
-        self.load_state_dict(state_dict=torch.load(path))
+        self.bert_model.bert.load_state_dict(state_dict=torch.load(path)) # changed this to bert_model load state_dict
         if torch.cuda.is_available(): self.cuda()
 
