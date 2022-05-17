@@ -35,9 +35,6 @@ logger = logging.getLogger(__name__)
 
 logger.info(f"CUDA info: device {torch.cuda.current_device()}, name: {torch.cuda.get_device_name(0)}")
 
-import IPython
-IPython.embed()
-
 def warmup_linear(x, warmup=0.002):
     if x < warmup:
         return x/warmup
@@ -52,16 +49,14 @@ class BERTDataset(Dataset):
         self.seq_len = seq_len
         self.corpus_path = corpus_path
         self.encoding = encoding
-        self.sample_to_doc = [] # map sample index to doc and line
-        self.all_docs = []
-        doc = []
+        self.sample_to_doc = [] # map sample index to doc and line that have been filtered (empty/length)
+        self.all_docs = [] # raw documents; list of lists (docs are lists of utterances)
+        doc = [] # list of utterances in a document 
 
-        
-        
         crsets = pickle.load(file=open(corpus_path, 'rb'))
-        cnt=0
-        lcnt=0
-        for crset in tqdm(crsets):
+        cnt=0 # track the number of lines that aren't used  
+        lcnt=0 # track the number of short documents ? 
+        for crset in tqdm(crsets): # for each document in corpus, create a list of turns as strings + samples
             for line in crset:
                 if len(line) == 0:
                     continue
@@ -83,6 +78,7 @@ class BERTDataset(Dataset):
             else:
                 print("empty")
 
+            # Record #turns if doc has < 4 (hardcoded for context length experiments); treated as special case
             if (len(doc) < 4):
                 for i in range(len(doc) - 1):
                     self.sample_to_doc.pop()
@@ -90,8 +86,8 @@ class BERTDataset(Dataset):
                 self.sample_to_doc[-1]['end'] = len(doc)
             
                 lcnt+=1
-            else:
-                
+            
+            else:    
                 self.sample_to_doc.pop()
                 self.sample_to_doc.pop()
                 self.sample_to_doc.pop()
@@ -110,48 +106,51 @@ class BERTDataset(Dataset):
     def __len__(self):
         return len(self.sample_to_doc)
 
-    def __getitem__(self, item):
+    def __getitem__(self, item, tokenize_output=True):
         sample = self.sample_to_doc[item]
         length = sample['end']
 
-        #dailogue session length < short context length k.
-        if length != 0:
+        # Special case where dailogue session length < short context length k (sample will just contain less context)
+        if length != 0: # essentially a boolean
             tokens_a = []
+            context = []
             for i in range(length - 1):
                 tokens_a+=self.tokenizer.tokenize(self.all_docs[sample["doc_id"]][i])+[self.tokenizer.eos_token]
+                context.append(self.all_docs[sample["doc_id"][i]]
             tokens_a.pop()
 
             #response = self.all_docs[sample["doc_id"]][sample["line"] + length - 1]
             rand=random.random()
+            
             if rand > 0.75:
-
                 # next correct response
                 response = self.all_docs[sample["doc_id"]][length - 1]
                 is_next_label = 2
 
-
             elif rand > 0.5:
-
                 # random utterance in the same dialogue session.
-
                 rand_idx = random.randint(0, length - 2)
-
                 response = self.all_docs[sample["doc_id"]][rand_idx]
-
                 is_next_label = 1
 
             else:
-
                 #random utterace
                 response = self.get_random_line(sample)
                 is_next_label = 0
 
             tokens_b = self.tokenizer.tokenize(response)
             # used later to avoid random nextSentence from same doc
+            if not tokenize_output:
+                return context, response, is_next_label
 
+        # Normal case (when dialogue session has long enough context)
         else:
             # short context length k= 3 in ubuntu corpus.
             t1, t2, t3, t4, is_next_label = self.random_sent(item)
+
+            if not tokenize_output:
+                return [t1, t2, t3], t4, is_next_label
+
             # tokenize
             tokens_a = self.tokenizer.tokenize(t1)+[self.tokenizer.eos_token]+self.tokenizer.tokenize(t2)+[self.tokenizer.eos_token]+self.tokenizer.tokenize(t3)
             tokens_b = self.tokenizer.tokenize(t4)
@@ -171,7 +170,12 @@ class BERTDataset(Dataset):
         return cur_tensors
 
     def random_sent(self, index):
-        
+        """
+        For a dialogue session with > 4 (hardcoded) context turns, build a (context, response, label) training sample where label is selected randomly between {0: random, 1: semantically-similar, 2: next}.
+
+        Args
+           index (int): index of document in self.samples_to_doc
+        """
         sample = self.sample_to_doc[index]
         t1 = self.all_docs[sample["doc_id"]][sample["line"]]
         t2 = self.all_docs[sample["doc_id"]][sample["line"] + 1]
@@ -424,9 +428,6 @@ def main():
     #model.bert.load_state_dict(state_dict=torch.load("ubuntu_final/checkpoint20-1637300/bert.pt"))
     model.to(device)
 
-
-
-    
     num_train_steps = None
     print("Loading Train Dataset", args.train_file)
     train_dataset = BERTDataset(args.train_file, tokenizer, seq_len=args.max_seq_length,
@@ -458,6 +459,10 @@ def main():
     train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.train_batch_size,num_workers=2)
     learning_rate=args.learning_rate
     before = 10
+
+    import IPython
+    IPython.embed()
+
     for epoch in trange(1, int(args.num_train_epochs) + 1, desc="Epoch"):
         tr_loss = 0
         for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration",position=0)):
@@ -467,6 +472,10 @@ def main():
             model.train()
             optimizer.zero_grad()
             prediction_scores, seq_relationship_score = model(input_ids=input_ids,attention_mask= input_mask, token_type_ids=segment_ids)
+            # out = model(input_ids=input_ids,attention_mask= input_mask, token_type_ids=segment_ids)
+            # prediction_scores = out['prediction_logits']
+            # seq_relationship_score = out['seq_relationship_logits']           
+            
             #logits = torch.sigmoid(output[0].squeeze())
             if lm_label_ids is not None and is_next is not None:
                 loss_fct = CrossEntropyLoss(ignore_index=-1)
