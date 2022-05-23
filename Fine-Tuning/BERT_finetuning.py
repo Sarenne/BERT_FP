@@ -12,12 +12,15 @@ from torch.utils.data import Dataset
 import torch.nn.functional as F
 
 FT_model={
+    'switchboard': 'bert-base-uncased',
     'ubuntu': 'bert-base-uncased',
     'douban': 'bert-base-chinese',
     'e_commerce': 'bert-base-chinese'
 }
 
-ubuntu25_bert_path = "/disk/scratch/swallbridge/BERT_FP/post-train/ubuntu25/bert.pt"
+# checkpoint_bert_path = "/disk/scratch/swallbridge/BERT_FP/post-train/ubuntu25/bert.pt"
+checkpoint_bert_path = "/disk/scratch/swallbridge/BERT_FP/FPT/PT_checkpoint/switchboard/train_small/checkpoint25-825-1.958938054740429/bert.pt"
+
 
 MODEL_CLASSES = {
     'bert': (BertConfig, BertForSequenceClassification, BertTokenizer)
@@ -157,11 +160,12 @@ class NeuralNetwork(nn.Module):
         special_tokens_dict = {'eos_token': '[eos]'}
         num_added_toks = self.bert_tokenizer.add_special_tokens(special_tokens_dict)
         self.bert_model = model_class.from_pretrained(FT_model[args.task],config=self.bert_config)
-        
+        print(f'Loaded BERT from pre-trained ({FT_model[args.task]})') 
 
         self.bert_model.resize_token_embeddings(len(self.bert_tokenizer))
         """You can load the post-trained checkpoint here."""
-        self.bert_model.bert.load_state_dict(state_dict=torch.load(ubuntu25_bert_path))
+        # self.bert_model.bert.load_state_dict(state_dict=torch.load(checkpoint_bert_path))
+        # print(f'Loaded BERT from checkpoint ({checkpoint_bert_path})')
         # self.bert_model.bert.load_state_dict(state_dict=torch.load("./post-train/ubuntu25/bert.pt"))
         # self.bert_model.bert.load_state_dict(state_dict=torch.load("./FPT/PT_checkpoint/ubuntu25/bert.pt"))
         #self.bert_model.bert.load_state_dict(state_dict=torch.load("./FPT/PT_checkpoint/douban27/bert.pt"))
@@ -177,14 +181,13 @@ class NeuralNetwork(nn.Module):
             batch_ids, batch_mask, batch_seg, batch_y, batch_len = (item.cuda(device=self.device) for item in data)
 
         self.optimizer.zero_grad()
-
         output = self.bert_model(batch_ids, batch_mask, batch_seg)
-
         logits = torch.sigmoid(output[0])
         loss = self.loss_func(logits.squeeze(), target=batch_y)
         loss.backward()
 
         self.optimizer.step()
+
         if i % 100 == 0:
             print('Batch[{}] - loss: {:.6f}  batch_size:{}'.format(i, loss.item(),
                                                                    batch_y.size(0)))  
@@ -244,7 +247,7 @@ class NeuralNetwork(nn.Module):
                     str(score) + '\t' +
                     str(label) + '\n'
                 )
-        if is_test == False and self.args.task !='ubuntu':
+        if is_test == False and (self.args.task !='ubuntu' or self.args.task != 'switchboard'):
             self.metrics.segment = 2
         else:
             self.metrics.segment = 10

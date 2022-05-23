@@ -12,6 +12,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 #Dataset path.
 FT_data={
+    'switchboard' : 'spoken_data/switchboard_dataset_docs.pkl',
     'ubuntu': 'ubuntu_data/ubuntu_dataset_1M.pkl',
     'douban': 'douban_data/douban_dataset_1M.pkl',
     'e_commerce': 'e_commerce_data/e_commerce_dataset_1M.pkl'
@@ -63,22 +64,28 @@ print("Task: ", args.task)
 
 def train_model(train, dev):
     model = NeuralNetwork(args=args)
+
+    import IPython
+    IPython.embed()
+
     model.fit(train, dev)
 
 
 def test_model(test):
     model = NeuralNetwork(args=args)
     model.load_model(args.save_path)
+
+    import IPython
+    IPython.embed()   
+ 
     model.evaluate(test, is_test=True)
 
 
 if __name__ == '__main__':
     start = time.time()
+
     with open(FT_data[args.task], 'rb') as f:
         train, dev, test = pickle.load(f, encoding='ISO-8859-1')
-
-    import IPython
-    IPython.embed()
 
     if args.is_training==True:
         train_model(train,dev)
