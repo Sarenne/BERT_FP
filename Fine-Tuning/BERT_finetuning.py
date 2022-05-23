@@ -260,8 +260,10 @@ class NeuralNetwork(nn.Module):
               "R2:", result[4], "\t",
               "R5:", result[5])
 
-        if not is_test and result[3] + result[4] + result[5] > self.best_result[3] + self.best_result[4] + \
+        # if in training mode, and current results are best so far, save model 
+        if not(is_test) and result[3] + result[4] + result[5] > self.best_result[3] + self.best_result[4] + \
                 self.best_result[5]:
+            self.best_result = result
             print("Best Result: \n",
                   "MAP:", self.best_result[0], "\t",
                   "MRR:", self.best_result[1], "\t",
@@ -270,7 +272,7 @@ class NeuralNetwork(nn.Module):
                   "R2:", self.best_result[4], "\t",
                   "R5:", self.best_result[5])
             self.patience = 0
-            self.best_result = result
+            # self.best_result = result
             torch.save(self.state_dict(), self.args.save_path)
             print("save model!!!\n")
         else:
