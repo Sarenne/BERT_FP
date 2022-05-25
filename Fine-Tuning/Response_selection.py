@@ -39,7 +39,7 @@ parser.add_argument("--learning_rate",
                     help="The initial learning rate for Adamw.")
 parser.add_argument("--epochs", 
                     default=2,
-                    type=float,
+                    type=int,
                     help="Total number of training epochs to perform.")
 parser.add_argument("--save_path",
                     # default="./Fine-Tuning/FT_checkpoint/",
@@ -73,11 +73,7 @@ def train_model(train, dev):
 
 def test_model(test):
     model = NeuralNetwork(args=args)
-    model.load_model(args.save_path)
-
-    import IPython
-    IPython.embed()   
- 
+    model.load_model(args.save_path)   
     model.evaluate(test, is_test=True)
 
 
@@ -89,8 +85,10 @@ if __name__ == '__main__':
 
     if args.is_training==True:
         train_model(train,dev)
+        test_model(dev)
         test_model(test)
     else:
+        test_model(dev)
         test_model(test)
 
     end = time.time()
