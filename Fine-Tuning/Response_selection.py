@@ -12,7 +12,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 #Dataset path.
 FT_data={
-    'switchboard' : 'spoken_data/switchboard_dataset_docs.pkl',
+    'switchboard' : 'spoken_data/switchboard_dataset_samples.pkl',
     'ubuntu': 'ubuntu_data/ubuntu_dataset_1M.pkl',
     'douban': 'douban_data/douban_dataset_1M.pkl',
     'e_commerce': 'e_commerce_data/e_commerce_dataset_1M.pkl'
