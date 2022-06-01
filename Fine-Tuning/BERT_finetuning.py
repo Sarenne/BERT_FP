@@ -19,7 +19,8 @@ FT_model={
 }
 
 # checkpoint_bert_path = "/disk/scratch/swallbridge/BERT_FP/post-train/ubuntu25/bert.pt"
-checkpoint_bert_path = "/disk/scratch/swallbridge/BERT_FP/FPT/PT_checkpoint/switchboard/train_small/checkpoint25-825-1.958938054740429/bert.pt"
+# checkpoint_bert_path = "/disk/scratch/swallbridge/BERT_FP/FPT/PT_checkpoint/switchboard/train_small/checkpoint25-825-1.958938054740429/bert.pt"
+checkpoint_bert_path = "/disk/scratch/swallbridge/BERT_FP/FPT/PT_checkpoint/switchboard/full_train_val/checkpoint8-66896-2.3206088173804336-2.4992520809173584/bert.pt"
 
 
 MODEL_CLASSES = {
@@ -164,8 +165,8 @@ class NeuralNetwork(nn.Module):
 
         self.bert_model.resize_token_embeddings(len(self.bert_tokenizer))
         """You can load the post-trained checkpoint here."""
-        # self.bert_model.bert.load_state_dict(state_dict=torch.load(checkpoint_bert_path))
-        # print(f'Loaded BERT from checkpoint ({checkpoint_bert_path})')
+        self.bert_model.bert.load_state_dict(state_dict=torch.load(checkpoint_bert_path))
+        print(f'Loaded BERT from checkpoint ({checkpoint_bert_path})')
         # self.bert_model.bert.load_state_dict(state_dict=torch.load("./post-train/ubuntu25/bert.pt"))
         # self.bert_model.bert.load_state_dict(state_dict=torch.load("./FPT/PT_checkpoint/ubuntu25/bert.pt"))
         #self.bert_model.bert.load_state_dict(state_dict=torch.load("./FPT/PT_checkpoint/douban27/bert.pt"))
@@ -297,6 +298,7 @@ class NeuralNetwork(nn.Module):
         return y_pred
 
     def load_model(self, path):
+        print(f"Loading model from {path}")
         self.load_state_dict(state_dict=torch.load(path))
         #self.bert_model.bert.load_state_dict(state_dict=torch.load(path)) # changed this to bert_model load state_dict
         if torch.cuda.is_available(): self.cuda()
