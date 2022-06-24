@@ -176,7 +176,7 @@ class NeuralNetwork(nn.Module):
         self.bert_model = self.bert_model.cuda()
 
         """ Freeze layers here """
-        for name, param in model.named_parameters():
+        for name, param in self.named_parameters():
             if 'classifier' in name: continue
             else:
                 param.requires_grad = False
@@ -219,6 +219,8 @@ class NeuralNetwork(nn.Module):
         ]
         self.optimizer = AdamW(optimizer_grouped_parameters, lr=self.args.learning_rate,correct_bias=True)  
 
+        losses = []
+
         for epoch in range(self.args.epochs):
             print("\nEpoch ", epoch + 1, "/", self.args.epochs)
             avg_loss = 0
@@ -239,8 +241,13 @@ class NeuralNetwork(nn.Module):
                 avg_loss += loss.item()
             cnt = len(train['y']) // self.args.batch_size + 1
             print("Average loss:{:.6f} ".format(avg_loss / cnt))
+            
+            losses.append(avg_loss / cnt)
 
             self.evaluate(dev)
+        loss_list = {'train': losses}
+        with open(f'{self.args.save_path}-data_losses.json', 'w') as fp:
+            json.dump(loss_list, fp)
 
     def adjust_learning_rate(self, decay_rate=.5):
         for param_group in self.optimizer.param_groups:

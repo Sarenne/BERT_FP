@@ -46,6 +46,10 @@ parser.add_argument("--save_path",
                     default="./fine-tune/",
                     type=str,
                     help="The path to save model.")
+parser.add_argument("--checkpoint_path",
+                    default="",
+                    type=str,
+                    help="The path to load model from checkpoint.")
 parser.add_argument("--score_file_path",
                     default="./Fine-Tuning/scorefile.txt",
                     type=str,
@@ -74,6 +78,8 @@ def train_model(train, dev):
 def test_model(test):
     model = NeuralNetwork(args=args)
     model.load_model(args.save_path)   
+    import IPython
+    IPython.embed()
     model.evaluate(test, is_test=True)
 
 
