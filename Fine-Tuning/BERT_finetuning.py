@@ -246,6 +246,7 @@ class NeuralNetwork(nn.Module):
 
             self.evaluate(dev)
         loss_list = {'train': losses}
+        print(f'Losses: {loss_list}')
         with open(f'{self.args.save_path}-data_losses.json', 'w') as fp:
             json.dump(loss_list, fp)
 
@@ -307,7 +308,7 @@ class NeuralNetwork(nn.Module):
                 output = self.bert_model(batch_ids, batch_mask, batch_seg)
                 logits = torch.sigmoid(output[0]).squeeze()
 
-            if i % 100 == 0:
+            if i % 1000 == 0:
                 print('Batch[{}] batch_size:{}'.format(i, batch_ids.size(0))) 
             y_pred += logits.data.cpu().numpy().tolist()
         return y_pred
