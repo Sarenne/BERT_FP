@@ -20,6 +20,7 @@ import torch.nn as nn
 import pickle
 
 from torch.utils.data import Dataset
+from torch.utils.tensorboard import SummaryWriter
 import random
 from setproctitle import setproctitle
 setproctitle('jaden han')
@@ -117,7 +118,7 @@ class BERTDataset(Dataset):
                 context = []
                 for i in range(length - 1):
                     tokens_a+=self.tokenizer.tokenize(self.all_docs[sample["doc_id"]][i])+[self.tokenizer.eos_token]
-                    context.append(self.all_docs[sample["doc_id"][i]])
+                    context.append(self.all_docs[sample["doc_id"]][i])
                 tokens_a.pop()
 
                 #response = self.all_docs[sample["doc_id"]][sample["line"] + length - 1]
@@ -387,6 +388,10 @@ def main():
                         default="./spoken_data/swb_train.pkl",
                         type=str,
                         help="The input train corpus.")
+    parser.add_argument("--val_file",
+                        default="./spoken_data/swb_val.pkl",
+                        type=str,
+                        help="The input validation corpus.")
     parser.add_argument("--bert_model", default="bert-base-uncased", type=str,
                         help="Bert pre-trained model selected in the list: bert-base-uncased, "
                              "bert-large-uncased, bert-base-cased, bert-base-multilingual, bert-base-chinese.")
@@ -431,6 +436,9 @@ def main():
 
     device = torch.device("cuda")
 
+    # For logging through tensorboard
+    writer = SummaryWriter()
+
     if args.gradient_accumulation_steps < 1:
         raise ValueError("Invalid gradient_accumulation_steps parameter: {}, should be >= 1".format(
                             args.gradient_accumulation_steps))
@@ -456,6 +464,9 @@ def main():
     print("Loading Train Dataset", args.train_file)
     train_dataset = BERTDataset(args.train_file, tokenizer, seq_len=args.max_seq_length,
                                 corpus_lines=None)
+    print("Loading Validation Dataset", args.val_file)
+    val_dataset = BERTDataset(args.val_file, tokenizer, seq_len=args.max_seq_length,
+                                corpus_lines=None)
     num_train_steps = int(
         len(train_dataset) / args.train_batch_size / args.gradient_accumulation_steps * args.num_train_epochs)
 
@@ -478,9 +489,11 @@ def main():
 
 
     train_sampler = RandomSampler(train_dataset)
-
+    val_sampler = RandomSampler(val_dataset)
 
     train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.train_batch_size,num_workers=2)
+    val_dataloader = DataLoader(val_dataset, sampler=val_sampler, batch_size=args.train_batch_size,num_workers=2)
+
     learning_rate=args.learning_rate
     before = 10
 
@@ -510,6 +523,7 @@ def main():
 
             model.zero_grad()
             loss = total_loss
+
             if step%100==0:
                 print('Batch[{}] - loss: {:.6f}  batch_size:{}'.format(step, loss.item(),args.train_batch_size) )
             if args.gradient_accumulation_steps > 1:
@@ -529,6 +543,7 @@ def main():
                 global_step += 1
 
         averloss=tr_loss/step
+        writer.add_scalar("loss_train", averloss, epoch)
         print("epoch: %d\taverageloss: %f\tstep: %d "%(epoch,averloss,step))
         print("current learning_rate: ", learning_rate)
         if global_step/num_train_steps > args.warmup_proportion and averloss > before - 0.01:
@@ -539,11 +554,33 @@ def main():
 
         before=averloss
 
+        # Validation loop
+        vl_loss = 0
+        for step, batch in enumerate(tqdm(val_dataloader, desc="Iteration",position=0)):
+            with torch.no_grad():
+                batch = (item.cuda(device=device) for item in batch)
+                input_ids, input_mask, segment_ids,lm_label_ids, is_next = batch
+                model.eval()
+
+                prediction_scores, seq_relationship_score = model(input_ids=input_ids,attention_mask= input_mask, token_type_ids=segment_ids)
+                if lm_label_ids is not None and is_next is not None:
+                    loss_fct = CrossEntropyLoss(ignore_index=-1)
+                    masked_lm_loss = loss_fct(prediction_scores.view(-1, model.config.vocab_size),
+                                            lm_label_ids.view(-1))
+                    next_sentence_loss = loss_fct(seq_relationship_score.view(-1, 3), is_next.view(-1))
+                    total_loss = masked_lm_loss + next_sentence_loss
+
+                    vl_loss += total_loss
+
+        averloss_val = vl_loss/step
+        writer.add_scalar("loss_valid", averloss_val, epoch)
+        print("epoch: %d\taverage_val_loss: %f"%(epoch,averloss_val))
+
         if True:
             # Save a trained model
             logger.info("** ** * Saving fine - tuned model ** ** * ")
             checkpoint_prefix = 'checkpoint' + str(epoch)
-            output_dir = os.path.join(args.output_dir, '{}-{}-{}'.format(checkpoint_prefix, global_step, averloss))
+            output_dir = os.path.join(args.output_dir, '{}-{}-{}-{}'.format(checkpoint_prefix, global_step, averloss, averloss_val))
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
             output_dir1 = output_dir + '/bert.pt'
