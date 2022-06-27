@@ -199,7 +199,7 @@ class NeuralNetwork(nn.Module):
 
         self.optimizer.step()
 
-        if i % 100 == 0:
+        if i % 1000 == 0:
             print('Batch[{}] - loss: {:.6f}  batch_size:{}'.format(i, loss.item(),
                                                                    batch_y.size(0)))  
         return loss
@@ -268,7 +268,7 @@ class NeuralNetwork(nn.Module):
                     str(score) + '\t' +
                     str(label) + '\n'
                 )
-        if is_test == False and (self.args.task !='ubuntu' or self.args.task != 'switchboard'): # TODO, I think this is why the val scores are printing wrong -- might be setting to 2 instead of 10
+        if is_test == False and self.args.task !='ubuntu' and self.args.task != 'switchboard': # TODO, I think this is why the val scores are printing wrong -- might be setting to 2 instead of 10
             self.metrics.segment = 2
         else:
             self.metrics.segment = 10
@@ -314,7 +314,7 @@ class NeuralNetwork(nn.Module):
                 output = self.bert_model(batch_ids, batch_mask, batch_seg)
                 logits = torch.sigmoid(output[0]).squeeze()
 
-            if i % 1000 == 0:
+            if i % 100 == 0:
                 print('Batch[{}] batch_size:{}'.format(i, batch_ids.size(0))) 
             y_pred += logits.data.cpu().numpy().tolist()
         return y_pred
@@ -324,13 +324,17 @@ class NeuralNetwork(nn.Module):
         self.load_state_dict(state_dict=torch.load(path))
         #self.bert_model.bert.load_state_dict(state_dict=torch.load(path)) # changed this to bert_model load state_dict
         if torch.cuda.is_available(): self.cuda()
-    
+
     def describe_model(self):
         table = {}
-        total_params=0
-        for name, parameter in self.named_parameters():
-            if not parameter.requires_grad: continue
+        total_params = 0
+        train_params = 0
+        for name, parameter in self.named_parameters():          
             params = parameter.numel()
-            table[name] = params
-            total_params+=params
-        return table, total_params
+            if parameter.requires_grad: 
+                table[name] = params
+                train_params += params
+            else:
+                table[name] = 0
+            total_params += params
+        return table, total_params, train_params
