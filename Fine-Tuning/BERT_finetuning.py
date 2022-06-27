@@ -220,6 +220,7 @@ class NeuralNetwork(nn.Module):
         self.optimizer = AdamW(optimizer_grouped_parameters, lr=self.args.learning_rate,correct_bias=True)  
 
         losses = []
+        v_results = []
 
         for epoch in range(self.args.epochs):
             print("\nEpoch ", epoch + 1, "/", self.args.epochs)
@@ -241,11 +242,12 @@ class NeuralNetwork(nn.Module):
                 avg_loss += loss.item()
             cnt = len(train['y']) // self.args.batch_size + 1
             print("Average loss:{:.6f} ".format(avg_loss / cnt))
-            
             losses.append(avg_loss / cnt)
-
-            self.evaluate(dev)
-        loss_list = {'train': losses}
+            
+            eval_result = self.evaluate(dev)
+            v_results.append(eval_result)
+        
+        loss_list = {'train': losses, 'val': v_results}
         print(f'Losses: {loss_list}')
         with open(f'{self.args.save_path}-data_losses.json', 'w') as fp:
             json.dump(loss_list, fp)
@@ -264,10 +266,11 @@ class NeuralNetwork(nn.Module):
                     str(score) + '\t' +
                     str(label) + '\n'
                 )
-        if is_test == False and (self.args.task !='ubuntu' or self.args.task != 'switchboard'):
+        if is_test == False and (self.args.task !='ubuntu' or self.args.task != 'switchboard'): # TODO, I think this is why the val scores are printing wrong -- might be setting to 2 instead of 10
             self.metrics.segment = 2
         else:
             self.metrics.segment = 10
+        print(f'Number of samples: {self.metrics.segment}')
         result = self.metrics.evaluate_all_metrics()
         print("Evaluation Result: \n",
               "MAP:", result[0], "\t",
@@ -294,6 +297,7 @@ class NeuralNetwork(nn.Module):
             print("save model!!!\n")
         else:
             self.patience += 1
+        return result
 
     def predict(self, dev):
         self.eval()
