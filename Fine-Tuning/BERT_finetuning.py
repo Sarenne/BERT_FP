@@ -176,8 +176,10 @@ class NeuralNetwork(nn.Module):
         self.bert_model = self.bert_model.cuda()
 
         """ Freeze layers here """
+        unfreeze = ['classifier', 'pooler', '11', '10', '9', '8']
         for name, param in self.named_parameters():
-            if 'classifier' in name: continue
+            if any([ll in name for ll in unfreeze]): 
+                param.requires_grad = True
             else:
                 param.requires_grad = False
 
