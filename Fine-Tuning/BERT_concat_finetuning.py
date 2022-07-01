@@ -26,8 +26,8 @@ FT_model={
 
 
 MODEL_CLASSES = {
-#     'bert': (BertConfig, BertForSequenceClassification, BertTokenizer)
-    'bert': (BertConfig, BertForSequenceClassification, BertTokenizer)
+     'bert': (BertConfig, BertForSequenceClassification, BertTokenizer)
+#    'bert': (BertConfig, BertForPreTraining, BertTokenizer)
     
 }
 
@@ -56,16 +56,23 @@ class BERTDataset(Dataset):
         return len(self.train['cr'])
 
     def __getitem__(self, item):
-        cur_features = convert_examples_to_features(item, self.train, self.bert_tokenizer)
+        c_features, r_features = convert_examples_to_split_features(item, self.train, self.bert_tokenizer)
 
-        cur_tensors = (torch.tensor(cur_features.input_ids),
-                       torch.tensor(cur_features.input_mask),
-                       torch.tensor(cur_features.segment_ids),
-                       torch.tensor(cur_features.label, dtype=torch.float),
-                       torch.tensor(cur_features.lenidx)
-                       )
+        c_tensors = (torch.tensor(c_features.input_ids),
+                     torch.tensor(c_features.input_mask),
+                     torch.tensor(c_features.segment_ids),
+                     torch.tensor(c_features.label, dtype=torch.float),
+                     torch.tensor(c_features.lenidx)
+                     )
 
-        return cur_tensors
+        r_tensors = (torch.tensor(r_features.input_ids),
+                     torch.tensor(r_features.input_mask),
+                     torch.tensor(r_features.segment_ids),
+                     torch.tensor(r_features.label, dtype=torch.float),
+                     torch.tensor(r_features.lenidx)
+                     )
+
+        return c_tensors, r_tensors
 
 
 def _truncate_seq_pair(tokens_a, tokens_b, max_length):
@@ -125,13 +132,13 @@ def convert_examples_to_split_features(item, train, bert_tokenizer):
 
     # Zero-pad up to the sequence length.
     context_padding_length = 256 - len(context_input_ids)
-    if (padding_length > 0):
+    if (context_padding_length > 0):
         context_input_ids = context_input_ids + ([0] * context_padding_length)
         context_input_mask = context_input_mask + ([0] * context_padding_length)
         context_segment_ids = context_segment_ids + ([0] * context_padding_length) 
         
     response_padding_length = 256 - len(response_input_ids)
-    if (padding_length > 0):
+    if (response_padding_length > 0):
         response_input_ids = response_input_ids + ([0] * response_padding_length)
         response_input_mask = response_input_mask + ([0] * response_padding_length)
         response_segment_ids = response_segment_ids + ([0] * response_padding_length)
@@ -165,7 +172,9 @@ class NeuralNetwork(nn.Module):
 
         config_class, model_class, tokenizer_class = MODEL_CLASSES['bert']
         
-        self.bert_config = config_class.from_pretrained(FT_model[args.task])
+        # The CLS token is pushed through a linear layer from seq classification... 
+        standard_config = config_class.from_pretrained(FT_model[args.task])
+        self.bert_config = config_class.from_pretrained(FT_model[args.task], num_labels=standard_config.hidden_size)
         self.bert_tokenizer = BertTokenizer.from_pretrained(FT_model[args.task],do_lower_case=args.do_lower_case)
         special_tokens_dict = {'eos_token': '[eos]'}
         num_added_toks = self.bert_tokenizer.add_special_tokens(special_tokens_dict)
@@ -184,8 +193,8 @@ class NeuralNetwork(nn.Module):
         #self.bert_model.bert.load_state_dict(state_dict=torch.load("./FPT/PT_checkpoint/e_commerce34/bert.pt"))
         
         """Add the embedding layer here"""
-        enc_net = nn.Sequential(nn.Linear(bertconfig.hidden_size * 2, 1))
-        model.classifier = enc_net
+        enc_net = nn.Sequential(nn.Linear(self.bert_config.hidden_size * 2, 1))
+        self.classifier = enc_net
         
         self = self.cuda()
 #         self.bert_model = self.bert_model.cuda()
@@ -208,18 +217,18 @@ class NeuralNetwork(nn.Module):
         
         # Context batch
         with torch.no_grad():
-            c_batch_ids, c_batch_mask, c_batch_seg, c_batch_y, c_batch_len = (item.cuda(device=self.device) for item[0] in data)
+            c_batch_ids, c_batch_mask, c_batch_seg, batch_y, batch_len = (item.cuda(device=self.device) for item in data[0])
             
         # Response batch
         with torch.no_grad():
-            r_batch_ids, r_batch_mask, r_batch_seg, r_batch_y, r_batch_len = (item.cuda(device=self.device) for item[1] in data)
+            r_batch_ids, r_batch_mask, r_batch_seg, batch_y, r_batch_len = (item.cuda(device=self.device) for item in data[1])
 
         self.optimizer.zero_grad()
         
-        context_encs = self.bert_model(c_batch_ids, c_batch_mask, c_batch_seg)
-        response_encs = self.bert_model(r_batch_ids, r_batch_mask, r_batch_seg)
+        context_encs = self.bert_model(c_batch_ids, c_batch_mask, c_batch_seg)[0]
+        response_encs = self.bert_model(r_batch_ids, r_batch_mask, r_batch_seg)[0]
         
-        cat_encs = self.enc_net(torch.cat((context_encs, response_encs), 1))
+        cat_encs = self.classifier(torch.cat((context_encs, response_encs), 1))
         logits = torch.sigmoid(cat_encs).squeeze()
         loss = self.loss_func(logits, target=batch_y)
         loss.backward()
