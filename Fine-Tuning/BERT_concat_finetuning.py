@@ -1,3 +1,5 @@
+import json
+
 import torch
 import torch.nn as nn
 import torch.nn.utils as utils
@@ -6,7 +8,7 @@ from Metrics import Metrics
 import logging
 from torch.utils.data import  RandomSampler
 from transformers import AdamW
-from transformers import BertConfig, BertForSequenceClassification, BertTokenizer
+from transformers import BertConfig, BertForSequenceClassification, BertTokenizer, BertForPreTraining
 from tqdm import tqdm
 from torch.utils.data import Dataset
 import torch.nn.functional as F
@@ -24,7 +26,9 @@ FT_model={
 
 
 MODEL_CLASSES = {
+#     'bert': (BertConfig, BertForSequenceClassification, BertTokenizer)
     'bert': (BertConfig, BertForSequenceClassification, BertTokenizer)
+    
 }
 
 torch.backends.cudnn.benchmark = True
@@ -43,7 +47,7 @@ class InputFeatures(object):
 
 
 class BERTDataset(Dataset):
-    def __init__(self, args, train,tokenizer):
+    def __init__(self, args, train, tokenizer):
         self.train = train
         self.args = args
         self.bert_tokenizer = tokenizer
@@ -80,8 +84,7 @@ def _truncate_seq_pair(tokens_a, tokens_b, max_length):
         else:
             tokens_b.pop()
 
-
-def convert_examples_to_features(item, train, bert_tokenizer):
+def convert_examples_to_split_features(item, train, bert_tokenizer):
     """ Loads a data file into a list of `InputBatch`s
         `cls_token_at_end` define the location of the CLS token:
             - False (Default, BERT/XLM pattern): [CLS] + A + [SEP] + B + [SEP]
@@ -91,55 +94,61 @@ def convert_examples_to_features(item, train, bert_tokenizer):
     ex_index = item
     input_ids = train['cr'][item]
 
-
     sep = input_ids.index(bert_tokenizer.sep_token_id)
     context = input_ids[:sep]
     response = input_ids[sep + 1:]
-    _truncate_seq_pair(context, response, 253)
+    # _truncate_seq_pair(context, response, 253)
+    context = context[:253]
+    response = response[:253]
 
     # The convention in BERT is:
     # (a) For sequence pairs:
     #  tokens:   [CLS] is this jack ##son ##ville ? [SEP] no it is not . [SEP]
     #  type_ids:   0   0  0    0    0     0       0   0   1  1  1  1   1   1
-    # (b) For single sequences:
+    # *** (b) For single sequences:
     #  tokens:   [CLS] the dog is hairy . [SEP]
     #  type_ids:   0   0   0   0  0     0   0
-    #
-    # Where "type_ids" are used to indicate whether this is the first
-    # sequence or the second sequence. The embedding vectors for `type=0` and
-    # `type=1` were learned during pre-training and are added to the wordpiece
-    # embedding vector (and position vector). This is not *strictly* necessary
-    # since the [SEP] token unambiguously separates the sequences, but it makes
-    # it easier for the model to learn the concept of sequences.
-    #
-    # For classification tasks, the first vector (corresponding to [CLS]) is
-    # used as as the "sentence vector". Note that this only makes sense because
-    # the entire model is fine-tuned.
+    
     context_len = len(context)
 
-    input_ids = [bert_tokenizer.cls_token_id] + context + [bert_tokenizer.sep_token_id] + response + [
-        bert_tokenizer.sep_token_id]
-    segment_ids = [0] * (context_len + 2)  # context
-    segment_ids += [1] * (len(input_ids) - context_len - 2)  # #response
+    context_input_ids = [bert_tokenizer.cls_token_id] + context + [bert_tokenizer.sep_token_id] 
+    response_input_ids = [bert_tokenizer.cls_token_id] + response + [bert_tokenizer.sep_token_id]
     
+    context_segment_ids = [0] * (context_len + 2)  # context
+    response_segment_ids = [0] * len(response_input_ids)  # #response
+    
+    # TODO what are you? [sep token id, total len]?
     lenidx = [1 + context_len, len(input_ids) - 1]
 
-    input_mask = [1] * len(input_ids)
+    context_input_mask = [1] * len(context_input_ids)
+    response_input_mask = [1] * len(response_input_ids)
 
     # Zero-pad up to the sequence length.
-    padding_length = 256 - len(input_ids)
-
+    context_padding_length = 256 - len(context_input_ids)
     if (padding_length > 0):
-        input_ids = input_ids + ([0] * padding_length)
-        input_mask = input_mask + ([0] * padding_length)
-        segment_ids = segment_ids + ([0] * padding_length) 
+        context_input_ids = context_input_ids + ([0] * context_padding_length)
+        context_input_mask = context_input_mask + ([0] * context_padding_length)
+        context_segment_ids = context_segment_ids + ([0] * context_padding_length) 
+        
+    response_padding_length = 256 - len(response_input_ids)
+    if (padding_length > 0):
+        response_input_ids = response_input_ids + ([0] * response_padding_length)
+        response_input_mask = response_input_mask + ([0] * response_padding_length)
+        response_segment_ids = response_segment_ids + ([0] * response_padding_length)
 
-    features = InputFeatures(input_ids=input_ids,
-                             input_mask=input_mask,
-                             segment_ids=segment_ids,
-                             label=train['y'][item],
-                             lenidx=lenidx)
-    return features
+    c_features = InputFeatures(input_ids=context_input_ids,
+                               input_mask=context_input_mask,
+                               segment_ids=context_segment_ids,
+                               label=train['y'][item],
+                               lenidx=lenidx)
+    
+    r_features = InputFeatures(input_ids=response_input_ids,
+                               input_mask=response_input_mask,
+                               segment_ids=response_segment_ids,
+                               label=train['y'][item],
+                               lenidx=lenidx)
+    
+    return c_features, r_features            
 
 
 class NeuralNetwork(nn.Module):
@@ -155,8 +164,8 @@ class NeuralNetwork(nn.Module):
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
         config_class, model_class, tokenizer_class = MODEL_CLASSES['bert']
-
-        self.bert_config = config_class.from_pretrained(FT_model[args.task],num_labels=1)
+        
+        self.bert_config = config_class.from_pretrained(FT_model[args.task])
         self.bert_tokenizer = BertTokenizer.from_pretrained(FT_model[args.task],do_lower_case=args.do_lower_case)
         special_tokens_dict = {'eos_token': '[eos]'}
         num_added_toks = self.bert_tokenizer.add_special_tokens(special_tokens_dict)
@@ -164,6 +173,7 @@ class NeuralNetwork(nn.Module):
         print(f'Loaded BERT from pre-trained ({FT_model[args.task]})') 
 
         self.bert_model.resize_token_embeddings(len(self.bert_tokenizer))
+        
         """You can load the post-trained checkpoint here."""
         if args.checkpoint_path:
             self.bert_model.bert.load_state_dict(state_dict=torch.load(args.checkpoint_path))
@@ -173,7 +183,12 @@ class NeuralNetwork(nn.Module):
         #self.bert_model.bert.load_state_dict(state_dict=torch.load("./FPT/PT_checkpoint/douban27/bert.pt"))
         #self.bert_model.bert.load_state_dict(state_dict=torch.load("./FPT/PT_checkpoint/e_commerce34/bert.pt"))
         
-        self.bert_model = self.bert_model.cuda()
+        """Add the embedding layer here"""
+        enc_net = nn.Sequential(nn.Linear(bertconfig.hidden_size * 2, 1))
+        model.classifier = enc_net
+        
+        self = self.cuda()
+#         self.bert_model = self.bert_model.cuda()
 
         """ Freeze layers here """
         unfreeze = ['classifier', 'pooler', '11',] # ~same number of params as SBERT half unfrozen
@@ -190,13 +205,23 @@ class NeuralNetwork(nn.Module):
         raise NotImplementedError
 
     def train_step(self, i, data):
+        
+        # Context batch
         with torch.no_grad():
-            batch_ids, batch_mask, batch_seg, batch_y, batch_len = (item.cuda(device=self.device) for item in data)
+            c_batch_ids, c_batch_mask, c_batch_seg, c_batch_y, c_batch_len = (item.cuda(device=self.device) for item[0] in data)
+            
+        # Response batch
+        with torch.no_grad():
+            r_batch_ids, r_batch_mask, r_batch_seg, r_batch_y, r_batch_len = (item.cuda(device=self.device) for item[1] in data)
 
         self.optimizer.zero_grad()
-        output = self.bert_model(batch_ids, batch_mask, batch_seg)
-        logits = torch.sigmoid(output[0])
-        loss = self.loss_func(logits.squeeze(), target=batch_y)
+        
+        context_encs = self.bert_model(c_batch_ids, c_batch_mask, c_batch_seg)
+        response_encs = self.bert_model(r_batch_ids, r_batch_mask, r_batch_seg)
+        
+        cat_encs = self.enc_net(torch.cat((context_encs, response_encs), 1))
+        logits = torch.sigmoid(cat_encs).squeeze()
+        loss = self.loss_func(logits, target=batch_y)
         loss.backward()
 
         self.optimizer.step()
