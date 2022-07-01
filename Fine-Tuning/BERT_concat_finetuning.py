@@ -13,6 +13,14 @@ from tqdm import tqdm
 from torch.utils.data import Dataset
 import torch.nn.functional as F
 
+""" 
+Modified BERT-FP to concat version (ie, encode the context and response seperately as [CLS], concat them, then use an encoder to classify)
+
+Using BertForSequenceClassification for this (I couldn't figure out how to get the raw CLS token from BertForPretraining) by setting 
+seq_relationship to a linear fully-conntected layer. This is the CLS representation. Then I add model.classifier which takes the concat 
+encodings.
+"""
+
 FT_model={
     'switchboard': 'bert-base-uncased',
     'ubuntu': 'bert-base-uncased',
@@ -23,7 +31,6 @@ FT_model={
 # checkpoint_bert_path = "/disk/scratch/swallbridge/BERT_FP/post-train/ubuntu25/bert.pt"
 # checkpoint_bert_path = "/disk/scratch/swallbridge/BERT_FP/FPT/PT_checkpoint/switchboard/train_small/checkpoint25-825-1.958938054740429/bert.pt"
 # checkpoint_bert_path = "/disk/scratch/swallbridge/BERT_FP/FPT/PT_checkpoint/switchboard/full_train_val/checkpoint8-66896-2.3206088173804336-2.4992520809173584/bert.pt"
-
 
 MODEL_CLASSES = {
      'bert': (BertConfig, BertForSequenceClassification, BertTokenizer)
@@ -344,12 +351,21 @@ class NeuralNetwork(nn.Module):
         dataloader = DataLoader(dataset, batch_size=400)
 
         for i, data in tqdm(enumerate(dataloader), desc="Prediction dataloader"):
+            # Context batch
             with torch.no_grad():
-                batch_ids, batch_mask, batch_seg, batch_y, batch_len = (item.cuda() for item in data)
+                c_batch_ids, c_batch_mask, c_batch_seg, batch_y, batch_len = (item.cuda(device=self.device) for item in data[0])
+            
+            # Response batch
             with torch.no_grad():
-                output = self.bert_model(batch_ids, batch_mask, batch_seg)
-                logits = torch.sigmoid(output[0]).squeeze()
+                r_batch_ids, r_batch_mask, r_batch_seg, batch_y, r_batch_len = (item.cuda(device=self.device) for item in data[1])
+        
+            with torch.no_grad():
+                context_encs = self.bert_model(c_batch_ids, c_batch_mask, c_batch_seg)[0]
+                response_encs = self.bert_model(r_batch_ids, r_batch_mask, r_batch_seg)[0]
 
+                cat_encs = self.classifier(torch.cat((context_encs, response_encs), 1))
+                logits = torch.sigmoid(cat_encs).squeeze()
+                
             if i % 100 == 0:
                 print('Batch[{}] batch_size:{}'.format(i, batch_ids.size(0))) 
             y_pred += logits.data.cpu().numpy().tolist()
