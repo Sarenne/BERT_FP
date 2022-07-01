@@ -2,7 +2,7 @@ import time
 import argparse
 import pickle
 import os
-from BERT_finetuning import NeuralNetwork
+# from BERT_finetuning import NeuralNetwork
 from setproctitle import setproctitle
 
 setproctitle('BERT_FP')
@@ -56,6 +56,11 @@ parser.add_argument("--score_file_path",
                     help="The path to save model.")
 parser.add_argument("--do_lower_case", action='store_true', default=True,
                     help="Set this flag if you are using an uncased model.")
+parse.add_argument("--concat", 
+                   default=False
+                   type=bool,
+                   help="Run concat version of BERT-FP (modified) or False for original"
+                  )
 args = parser.parse_args()
 args.save_path += args.task + '.' + "0.pt"
 args.score_file_path = args.score_file_path
@@ -64,6 +69,12 @@ args.score_file_path = args.score_file_path
 
 print(args)
 print("Task: ", args.task)
+
+# Load the original or concat version of BERT-FP
+if args.concat:
+    from BERT_finetuning_concat import NeuralNetwork
+else:
+    from BERT_finetuning import NeuralNetwork
 
 
 def train_model(train, dev):
