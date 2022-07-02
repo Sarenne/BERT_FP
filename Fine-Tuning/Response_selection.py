@@ -56,8 +56,8 @@ parser.add_argument("--score_file_path",
                     help="The path to save model.")
 parser.add_argument("--do_lower_case", action='store_true', default=True,
                     help="Set this flag if you are using an uncased model.")
-parse.add_argument("--concat", 
-                   default=False
+parser.add_argument("--concat", 
+                   default=False,
                    type=bool,
                    help="Run concat version of BERT-FP (modified) or False for original"
                   )
@@ -72,7 +72,7 @@ print("Task: ", args.task)
 
 # Load the original or concat version of BERT-FP
 if args.concat:
-    from BERT_finetuning_concat import NeuralNetwork
+    from BERT_concat_finetuning import NeuralNetwork
 else:
     from BERT_finetuning import NeuralNetwork
 

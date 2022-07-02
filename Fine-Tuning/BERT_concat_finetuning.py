@@ -207,7 +207,7 @@ class NeuralNetwork(nn.Module):
 #         self.bert_model = self.bert_model.cuda()
 
         """ Freeze layers here """
-        unfreeze = ['classifier', 'pooler', '11',] # ~same number of params as SBERT half unfrozen
+        unfreeze = ['classifier', 'bert_model'] # 'pooler', '11',] # ~same number of params as SBERT half unfrozen
         for name, param in self.named_parameters():
             if any([ll in name for ll in unfreeze]): 
                 param.requires_grad = True
@@ -311,7 +311,7 @@ class NeuralNetwork(nn.Module):
                     str(score) + '\t' +
                     str(label) + '\n'
                 )
-        if is_test == False and self.args.task !='ubuntu' and self.args.task != 'switchboard': # TODO, I think this is why the val scores are printing wrong -- might be setting to 2 instead of 10
+        if is_test == False and self.args.task !='ubuntu' and self.args.task != 'switchboard':
             self.metrics.segment = 2
         else:
             self.metrics.segment = 10
@@ -367,7 +367,7 @@ class NeuralNetwork(nn.Module):
                 logits = torch.sigmoid(cat_encs).squeeze()
                 
             if i % 100 == 0:
-                print('Batch[{}] batch_size:{}'.format(i, batch_ids.size(0))) 
+                print('Batch[{}] batch_size:{}'.format(i, c_batch_ids.size(0))) 
             y_pred += logits.data.cpu().numpy().tolist()
         return y_pred
 
