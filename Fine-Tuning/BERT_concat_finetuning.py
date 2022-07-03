@@ -199,17 +199,33 @@ class NeuralNetwork(nn.Module):
         #self.bert_model.bert.load_state_dict(state_dict=torch.load("./FPT/PT_checkpoint/douban27/bert.pt"))
         #self.bert_model.bert.load_state_dict(state_dict=torch.load("./FPT/PT_checkpoint/e_commerce34/bert.pt"))
         
-        """Add the embedding layer here"""
-        enc_net = nn.Sequential(nn.Linear(self.bert_config.hidden_size * 2, 1))
+        """Add the embedding network here"""
+        input_dim = self.bert_config.hidden_size * 2 
+        hidden_dim = 384
+        output_dim = 1
+        dropout_p = 0.1
+        enc_net = nn.Sequential(nn.Linear(input_dim, hidden_dim),
+                                nn.ReLU(),
+                                nn.Dropout(p=dropout_p),
+                                nn.Linear(hidden_dim, hidden_dim),
+                                nn.ReLU(),
+                                nn.Dropout(p=dropout_p),
+                                nn.Linear(hidden_dim, hidden_dim),
+                                nn.ReLU(),
+                                nn.Dropout(p=dropout_p), 
+                                nn.Linear(hidden_dim, output_dim)
+                                )
+
+        # enc_net = nn.Sequential(nn.Linear(self.bert_config.hidden_size * 2, 1))
         self.classifier = enc_net
         
         self = self.cuda()
 #         self.bert_model = self.bert_model.cuda()
 
         """ Freeze layers here """
-        unfreeze = ['classifier.0', ] # 'bert_model'] # 'pooler', '11',] # ~same number of params as SBERT half unfrozen
+        unfreeze = ['classifier', ] # 'bert_model'] # 'pooler', '11',] # ~same number of params as SBERT half unfrozen
         for name, param in self.named_parameters():
-            if any([ll in name for ll in unfreeze]): 
+            if any([name.startswith(ll) for ll in unfreeze]): 
                 param.requires_grad = True
             else:
                 param.requires_grad = False
