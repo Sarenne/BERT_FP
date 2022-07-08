@@ -196,7 +196,6 @@ class NeuralNetwork(nn.Module):
         self.classifier = enc_net
         
         self = self.cuda()
-        
         # self.bert_model = self.bert_model.cuda()
 
         """ Freeze layers here """
