@@ -197,9 +197,9 @@ class NeuralNetwork(nn.Module):
         # self.bert_model = self.bert_model.cuda()
 
         """ Freeze layers here """
-        unfreeze = ['classifier', 'pooler', '11', '10', '9', '8']
+        unfreeze = ['classifier', 'bert_model'] # 'pooler', '11',] # ~same number of params as SBERT half unfrozen
         for name, param in self.named_parameters():
-            if any([ll in name for ll in unfreeze]): 
+            if any([name.startswith(ll) for ll in unfreeze]): 
                 param.requires_grad = True
             else:
                 param.requires_grad = False
