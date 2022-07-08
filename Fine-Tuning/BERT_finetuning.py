@@ -174,7 +174,7 @@ class NeuralNetwork(nn.Module):
         #self.bert_model.bert.load_state_dict(state_dict=torch.load("./FPT/PT_checkpoint/e_commerce34/bert.pt"))
         
         """Add the embedding network here"""
-        input_dim = self.bert_config.hidden_size * 2 
+        input_dim = self.bert_config.hidden_size 
         hidden_dim = 384
         output_dim = 1
         dropout_p = 0.1
