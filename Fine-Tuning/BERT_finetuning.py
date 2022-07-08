@@ -216,7 +216,7 @@ class NeuralNetwork(nn.Module):
         self.optimizer.zero_grad()
         # output = self.bert_model(batch_ids, batch_mask, batch_seg)
         # logits = torch.sigmoid(output[0]) # IS THIS WHERE THE CLS COMES FROM? 
-        enc = self.bert_model(batch_ids, batch_mask, batch_seg)
+        enc = self.bert_model(batch_ids, batch_mask, batch_seg)[0]
         output = self.classifier(enc)
         logits = torch.sigmoid(output).squeeze()
         loss = self.loss_func(logits, target=batch_y)
