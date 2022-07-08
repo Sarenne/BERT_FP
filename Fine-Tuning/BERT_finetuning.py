@@ -156,7 +156,9 @@ class NeuralNetwork(nn.Module):
 
         config_class, model_class, tokenizer_class = MODEL_CLASSES['bert']
 
-        self.bert_config = config_class.from_pretrained(FT_model[args.task],num_labels=1)
+        # The CLS token is pushed through a linear layer from seq classification... 
+        standard_config = config_class.from_pretrained(FT_model[args.task])
+        self.bert_config = config_class.from_pretrained(FT_model[args.task], num_labels=standard_config.hidden_size)
         self.bert_tokenizer = BertTokenizer.from_pretrained(FT_model[args.task],do_lower_case=args.do_lower_case)
         special_tokens_dict = {'eos_token': '[eos]'}
         num_added_toks = self.bert_tokenizer.add_special_tokens(special_tokens_dict)
@@ -164,6 +166,7 @@ class NeuralNetwork(nn.Module):
         print(f'Loaded BERT from pre-trained ({FT_model[args.task]})') 
 
         self.bert_model.resize_token_embeddings(len(self.bert_tokenizer))
+        
         """You can load the post-trained checkpoint here."""
         if args.checkpoint_path:
             self.bert_model.bert.load_state_dict(state_dict=torch.load(args.checkpoint_path))
