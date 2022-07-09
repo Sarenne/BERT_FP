@@ -338,8 +338,12 @@ class NeuralNetwork(nn.Module):
             with torch.no_grad():
                 batch_ids, batch_mask, batch_seg, batch_y, batch_len = (item.cuda() for item in data)
             with torch.no_grad():
-                output = self.bert_model(batch_ids, batch_mask, batch_seg)
-                logits = torch.sigmoid(output[0]).squeeze()
+                enc = self.bert_model(batch_ids, batch_mask, batch_seg)[0]
+                output = self.classifier(enc)
+                logits = torch.sigmoid(output).squeeze()
+                
+                # output = self.bert_model(batch_ids, batch_mask, batch_seg)
+                # logits = torch.sigmoid(output[0]).squeeze()
 
             if i % 100 == 0:
                 print('Batch[{}] batch_size:{}'.format(i, batch_ids.size(0))) 
