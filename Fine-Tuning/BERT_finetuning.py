@@ -1,4 +1,4 @@
-import torch
+mport torch
 import torch.nn as nn
 import torch.nn.utils as utils
 from torch.utils.data import DataLoader
@@ -10,6 +10,8 @@ from transformers import BertConfig, BertForSequenceClassification, BertTokenize
 from tqdm import tqdm
 from torch.utils.data import Dataset
 import torch.nn.functional as F
+
+import json
 
 FT_model={
     'switchboard': 'bert-base-uncased',
@@ -156,9 +158,7 @@ class NeuralNetwork(nn.Module):
 
         config_class, model_class, tokenizer_class = MODEL_CLASSES['bert']
 
-        # The CLS token is pushed through a linear layer from seq classification... 
-        standard_config = config_class.from_pretrained(FT_model[args.task])
-        self.bert_config = config_class.from_pretrained(FT_model[args.task], num_labels=standard_config.hidden_size)
+        self.bert_config = config_class.from_pretrained(FT_model[args.task],num_labels=1)
         self.bert_tokenizer = BertTokenizer.from_pretrained(FT_model[args.task],do_lower_case=args.do_lower_case)
         special_tokens_dict = {'eos_token': '[eos]'}
         num_added_toks = self.bert_tokenizer.add_special_tokens(special_tokens_dict)
@@ -166,7 +166,6 @@ class NeuralNetwork(nn.Module):
         print(f'Loaded BERT from pre-trained ({FT_model[args.task]})') 
 
         self.bert_model.resize_token_embeddings(len(self.bert_tokenizer))
-        
         """You can load the post-trained checkpoint here."""
         if args.checkpoint_path:
             self.bert_model.bert.load_state_dict(state_dict=torch.load(args.checkpoint_path))
@@ -176,37 +175,16 @@ class NeuralNetwork(nn.Module):
         #self.bert_model.bert.load_state_dict(state_dict=torch.load("./FPT/PT_checkpoint/douban27/bert.pt"))
         #self.bert_model.bert.load_state_dict(state_dict=torch.load("./FPT/PT_checkpoint/e_commerce34/bert.pt"))
         
-        """Add the embedding network here"""
-        input_dim = self.bert_config.hidden_size 
-        hidden_dim = 384
-        output_dim = 1
-        dropout_p = 0.1
-        enc_net = nn.Sequential(nn.Linear(input_dim, hidden_dim),
-                                nn.ReLU(),
-                                nn.Dropout(p=dropout_p),
-                                nn.Linear(hidden_dim, hidden_dim),
-                                nn.ReLU(),
-                                nn.Dropout(p=dropout_p),
-                                nn.Linear(hidden_dim, hidden_dim),
-                                nn.ReLU(),
-                                nn.Dropout(p=dropout_p), 
-                                nn.Linear(hidden_dim, output_dim)
-                                )
-        # enc_net = nn.Sequential(nn.Linear(self.bert_config.hidden_size * 2, 1))
-        self.classifier = enc_net
-        
-        self = self.cuda()
-        # self.bert_model = self.bert_model.cuda()
+        self.bert_model = self.bert_model.cuda()
 
         """ Freeze layers here """
-        unfreeze = ['classifier',]# 'bert_model'] # 'pooler', '11',] # ~same number of params as SBERT half unfrozen
+        unfreeze = ['classifier', 'pooler', '11', '10', '9', '8']
         for name, param in self.named_parameters():
-            if any([name.startswith(ll) for ll in unfreeze]): 
+            if any([ll in name for ll in unfreeze]): 
                 param.requires_grad = True
             else:
                 param.requires_grad = False
-                
-        self.describe_model()
+
 
     def forward(self):
         raise NotImplementedError
@@ -216,12 +194,9 @@ class NeuralNetwork(nn.Module):
             batch_ids, batch_mask, batch_seg, batch_y, batch_len = (item.cuda(device=self.device) for item in data)
 
         self.optimizer.zero_grad()
-        # output = self.bert_model(batch_ids, batch_mask, batch_seg)
-        # logits = torch.sigmoid(output[0]) # IS THIS WHERE THE CLS COMES FROM? 
-        enc = self.bert_model(batch_ids, batch_mask, batch_seg)[0]
-        output = self.classifier(enc)
-        logits = torch.sigmoid(output).squeeze()
-        loss = self.loss_func(logits, target=batch_y)
+        output = self.bert_model(batch_ids, batch_mask, batch_seg)
+        logits = torch.sigmoid(output[0])
+        loss = self.loss_func(logits.squeeze(), target=batch_y)
         loss.backward()
 
         self.optimizer.step()
@@ -338,12 +313,8 @@ class NeuralNetwork(nn.Module):
             with torch.no_grad():
                 batch_ids, batch_mask, batch_seg, batch_y, batch_len = (item.cuda() for item in data)
             with torch.no_grad():
-                enc = self.bert_model(batch_ids, batch_mask, batch_seg)[0]
-                output = self.classifier(enc)
-                logits = torch.sigmoid(output).squeeze()
-                
-                # output = self.bert_model(batch_ids, batch_mask, batch_seg)
-                # logits = torch.sigmoid(output[0]).squeeze()
+                output = self.bert_model(batch_ids, batch_mask, batch_seg)
+                logits = torch.sigmoid(output[0]).squeeze()
 
             if i % 100 == 0:
                 print('Batch[{}] batch_size:{}'.format(i, batch_ids.size(0))) 
