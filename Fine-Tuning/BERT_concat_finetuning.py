@@ -216,7 +216,7 @@ class NeuralNetwork(nn.Module):
                                 nn.Linear(hidden_dim, output_dim)
                                 )
 
-        enc_net = nn.Sequential(nn.Linear(self.bert_config.hidden_size * 2, 1))
+        # enc_net = nn.Sequential(nn.Linear(self.bert_config.hidden_size * 2, 1))
         self.classifier = enc_net
         
         self = self.cuda()
@@ -287,7 +287,7 @@ class NeuralNetwork(nn.Module):
         
         # Accumulate gradients (if required)
         if self.args.true_batch_size:
-            accum_steps = args.true_batch_size // self.args.batch_size
+            accum_steps = self.args.true_batch_size // self.args.batch_size
         else:
             accum_steps = 1
         print(f'Accumulating gradients over {accum_steps} batches')
@@ -307,7 +307,7 @@ class NeuralNetwork(nn.Module):
 
                 # Accumulate loss (as per https://medium.com/huggingface/training-larger-batches-practical-tips-on-1-gpu-multi-gpu-distributed-setups-ec88c3e51255)
                 loss = self.train_step(i, data)
-                loss = loss / accumulation_steps     # Normalize our loss (if averaged)
+                loss = loss / accum_steps            # Normalize our loss (if averaged)
                 loss.backward()                      # Backward pass
                 if (i+1) % accum_steps == 0:         # Wait for several backward steps
                     self.optimizer.step()            # Now we can do an optimizer step
