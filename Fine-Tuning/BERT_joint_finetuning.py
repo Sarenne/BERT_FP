@@ -194,7 +194,7 @@ class NeuralNetwork(nn.Module):
                                 nn.Dropout(p=dropout_p), 
                                 nn.Linear(hidden_dim, output_dim)
                                 )
-        # enc_net = nn.Sequential(nn.Linear(self.bert_config.hidden_size * 2, 1))
+        enc_net = nn.Sequential(nn.Linear(self.bert_config.hidden_size, 1))
         self.classifier = enc_net
         
         self = self.cuda()
@@ -231,6 +231,8 @@ class NeuralNetwork(nn.Module):
         if i % 1000 == 0:
             print('Batch[{}] - loss: {:.6f}  batch_size:{}'.format(i, loss.item(),
                                                                    batch_y.size(0)))  
+        if i == 1:
+            print(f'Example logits: {logits[:5]}')
         return loss
 
     def fit(self, train, dev):  
@@ -278,10 +280,10 @@ class NeuralNetwork(nn.Module):
             eval_result = self.evaluate(dev)
             v_results.append(eval_result)
         
-        loss_list = {'train': losses, 'val': v_results}
-        print(f'Losses: {loss_list}')
-        with open(f'{self.args.save_path}-data_losses.json', 'w') as fp:
-            json.dump(loss_list, fp)
+            loss_list = {'train': losses, 'val': v_results}
+            print(f'Losses: {loss_list}')
+            with open(f'{self.args.save_path}-data_losses.json', 'w') as fp:
+                json.dump(loss_list, fp)
 
     def adjust_learning_rate(self, decay_rate=.5):
         for param_group in self.optimizer.param_groups:

@@ -216,7 +216,7 @@ class NeuralNetwork(nn.Module):
                                 nn.Linear(hidden_dim, output_dim)
                                 )
 
-        # enc_net = nn.Sequential(nn.Linear(self.bert_config.hidden_size * 2, 1))
+        enc_net = nn.Sequential(nn.Linear(self.bert_config.hidden_size * 2, 1))
         self.classifier = enc_net
         
         self = self.cuda()

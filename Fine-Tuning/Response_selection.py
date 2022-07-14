@@ -61,6 +61,11 @@ parser.add_argument("--concat",
                    type=bool,
                    help="Run concat version of BERT-FP (modified) or False for original"
                   )
+parser.add_argument("--joint",
+                   default=False,
+                   type=bool,
+                   help="Run joint version of BERT-FP (modified) or False for original"
+                  )
 args = parser.parse_args()
 args.save_path += args.task + '.' + "0.pt"
 args.score_file_path = args.score_file_path
@@ -73,9 +78,10 @@ print("Task: ", args.task)
 # Load the original or concat version of BERT-FP
 if args.concat:
     from BERT_concat_finetuning import NeuralNetwork
+elif args.joint:
+    from BERT_joint_finetuning import NeuralNetwork
 else:
     from BERT_finetuning import NeuralNetwork
-
 
 def train_model(train, dev):
     model = NeuralNetwork(args=args)
