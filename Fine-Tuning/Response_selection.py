@@ -71,10 +71,15 @@ parser.add_argument("--joint",
                    help="Run joint version of BERT-FP (modified) or False for original"
                   )
 args = parser.parse_args()
+
+# If save_path doesn't exist, then create it.
+CHECK_FOLDER = os.path.isdir(args.save_path)
+if not CHECK_FOLDER:
+    os.makedirs(args.save_path)
+    print('Made save_path dir')
+
 args.save_path += args.task + '.' + "0.pt"
 args.score_file_path = args.score_file_path
-# load bert
-
 
 print(args)
 print("Task: ", args.task)
