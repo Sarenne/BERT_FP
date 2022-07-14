@@ -29,10 +29,14 @@ parser.add_argument("--is_training",
                     action='store_true',
                     help="Training model or testing model?")
 
+parser.add_argument("--true_batch_size",
+                    default=None,
+                    type=int,
+                    help="The batch size to accumulate gradients by. Default is to not accumulate gradients.")
 parser.add_argument("--batch_size",
                     default=32,
                     type=int,
-                    help="The batch size.")
+                    help="The batch size to compute loss by.")
 parser.add_argument("--learning_rate",
                     default=1e-5,
                     type=float,
