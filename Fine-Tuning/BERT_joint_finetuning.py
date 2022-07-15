@@ -256,7 +256,7 @@ class NeuralNetwork(nn.Module):
         
         # Accumulate gradients (if required)
         if self.args.true_batch_size:
-            accum_steps = args.true_batch_size // self.args.batch_size
+            accum_steps = self.args.true_batch_size // self.args.batch_size
         else:
             accum_steps = 1
         print(f'Accumulating gradients over {accum_steps} batches')
@@ -275,7 +275,7 @@ class NeuralNetwork(nn.Module):
                     self.patience = 0
 
                 loss = self.train_step(i, data) 
-                loss = loss / accumulation_steps     # Normalize our loss (if averaged)
+                loss = loss / accum_steps     # Normalize our loss (if averaged)
                 loss.backward()                      # Backward pass
                 if (i+1) % accum_steps == 0:         # Wait for several backward steps
                     self.optimizer.step()            # Now we can do an optimizer step
