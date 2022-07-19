@@ -204,19 +204,20 @@ class NeuralNetwork(nn.Module):
         hidden_dim = 384
         output_dim = 1
         dropout_p = 0.1
-        enc_net = nn.Sequential(nn.Linear(input_dim, hidden_dim),
-                                nn.ReLU(),
-                                nn.Dropout(p=dropout_p),
-                                nn.Linear(hidden_dim, hidden_dim),
-                                nn.ReLU(),
-                                nn.Dropout(p=dropout_p),
-                                nn.Linear(hidden_dim, hidden_dim),
-                                nn.ReLU(),
-                                nn.Dropout(p=dropout_p), 
-                                nn.Linear(hidden_dim, output_dim)
-                                )
-
-        # enc_net = nn.Sequential(nn.Linear(self.bert_config.hidden_size * 2, 1))
+        if not args.linear_encoder:
+            enc_net = nn.Sequential(nn.Linear(input_dim, hidden_dim),
+                                    nn.ReLU(),
+                                    nn.Dropout(p=dropout_p),
+                                    nn.Linear(hidden_dim, hidden_dim),
+                                    nn.ReLU(),
+                                    nn.Dropout(p=dropout_p),
+                                    nn.Linear(hidden_dim, hidden_dim),
+                                    nn.ReLU(),
+                                    nn.Dropout(p=dropout_p), 
+                                    nn.Linear(hidden_dim, output_dim)
+                                    )
+        else:
+            enc_net = nn.Sequential(nn.Linear(self.bert_config.hidden_size * 2, 1))
         self.classifier = enc_net
         
         self = self.cuda()
