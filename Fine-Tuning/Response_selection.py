@@ -70,6 +70,12 @@ parser.add_argument("--joint",
                    type=bool,
                    help="Run joint version of BERT-FP (modified) or False for original"
                   )
+parser.add_argument("--linear_encoder",
+                   default=True,
+                   type=bool,
+                   help="Should the classification encoder be linear or non-linear?"
+                  )
+
 args = parser.parse_args()
 
 # If save_path doesn't exist, then create it.
