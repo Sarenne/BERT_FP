@@ -303,11 +303,11 @@ class NeuralNetwork(nn.Module):
             self.patience += 1
         return result
 
-    def predict(self, dev):
+    def predict(self, dev, pred_batch_size=400):
         self.eval()
         y_pred = []
         dataset = BERTDataset(self.args, dev,self.bert_tokenizer)
-        dataloader = DataLoader(dataset, batch_size=400)
+        dataloader = DataLoader(dataset, batch_size=pred_batch_size)
 
         for i, data in tqdm(enumerate(dataloader), desc="Prediction dataloader"):
             with torch.no_grad():
