@@ -260,7 +260,7 @@ class BERTDataset(Dataset):
         sample_turns.remove(sample_text)
 
         # choose some random lines
-        # np.random.seed(indx) # unseeded so that it selects different things!!
+        np.random.seed(sample["doc_id"]+sample["line"]) # unseeded so that it selects different things!!
         lines = list(np.random.choice(sample_turns, size=num_negs, replace=False))
 
         return lines
