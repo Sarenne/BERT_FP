@@ -52,6 +52,7 @@ class BERTDataset(Dataset):
         self.encoding = encoding
         self.sample_to_doc = [] # map sample index to doc and line that have been filtered (empty/length)
         self.all_docs = [] # raw documents; list of lists (docs are lists of utterances)
+        self.all_turns = []
         doc = [] # list of utterances in a document 
 
         crsets = pickle.load(file=open(corpus_path, 'rb'))
@@ -96,13 +97,13 @@ class BERTDataset(Dataset):
             doc = []
             
         print(cnt,lcnt)
-
-
         
         for doc in self.all_docs:
             if len(doc) == 0:
                 print("problem")
 
+        self.all_turns = [t for conv in self.all_docs for t in conv]
+        self.unique_turns = list(set(self.all_turns))
 
     def __len__(self):
         return len(self.sample_to_doc)
@@ -246,9 +247,22 @@ class BERTDataset(Dataset):
 
         # choose some random lines
         # np.random.seed(indx) # unseeded so that it selects different things!!
-        line_ids = np.random.choice(range(len(tups)), size=num_negs, replace=True)
+        line_ids = np.random.choice(range(len(tups)), size=num_negs, replace=True) # I think this should be replace=False
         lines = [self.all_docs[tups[i][0]][tups[i][1]] for i in line_ids]
         
+        return lines
+
+    def get_random_unique_lines(self, sample, num_negs, seed=123):
+        """Randomly select num_neg turns (lines) from all UNIQUE turns in the corpus (ignoring the given sample turn) """
+        # remove the line corresponding to sample
+        sample_text = self.all_docs[sample["doc_id"]][sample["line"]]
+        sample_turns = self.unique_turns.copy()
+        sample_turns.remove(sample_text)
+
+        # choose some random lines
+        # np.random.seed(indx) # unseeded so that it selects different things!!
+        lines = list(np.random.choice(sample_turns, size=num_negs, replace=False))
+
         return lines
 
 
