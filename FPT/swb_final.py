@@ -252,19 +252,29 @@ class BERTDataset(Dataset):
         
         return lines
 
-    def get_random_unique_lines(self, sample, num_negs, seed=123):
+    def get_random_unique_lines(self, response_sample, num_negs, remove_context=True):
         """Randomly select num_neg turns (lines) from all UNIQUE turns in the corpus (ignoring the given sample turn) """
-        # remove the line corresponding to sample
-        sample_text = self.all_docs[sample["doc_id"]][sample["line"]]
+        # Turns to sample from
         sample_turns = self.unique_turns.copy()
-        sample_turns.remove(sample_text)
 
-        # choose some random lines
-        np.random.seed(sample["doc_id"]+sample["line"]) # unseeded so that it selects different things!!
+        # Remove response sample text from sample_turns
+        response_text = self.all_docs[response_sample["doc_id"]][response_sample["line"]]
+        sample_turns.remove(response_text)
+
+        # Remove context turns from sample_turns
+        if remove_context:
+            t1_text = self.all_docs[response_sample["doc_id"]][response_sample["line"] - 3]
+            t2_text = self.all_docs[response_sample["doc_id"]][response_sample["line"] - 2]
+            t3_text = self.all_docs[response_sample["doc_id"]][response_sample["line"] - 1]
+
+            for t in [t1_text, t2_text, t3_text]:
+                sample_turns.remove(t)
+
+        # Choose some random lines
+        np.random.seed(int(str(response_sample["doc_id"])+str(response_sample["line"]))) # comment for unseeded, so that it selects different things!!
         lines = list(np.random.choice(sample_turns, size=num_negs, replace=False))
 
         return lines
-
 
 
 class InputExample(object):
