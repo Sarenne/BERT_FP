@@ -60,13 +60,14 @@ class BERTDataset(Dataset):
         lcnt=0 # track the number of short documents ? 
         
         # Check if the loaded dataset contains meta info (each line is a dict) or not (each line is str)
+        self.meta = False
         if type(crsets[0][0]) == dict:
             self.meta = True
         
         for crset in tqdm(crsets): # for each document in corpus, create a list of turns as strings + samples
             for line in crset:
                 # Get the text from the line
-                if meta:
+                if self.meta:
                     l_text = line['clean_text']
                 else:
                     l_text = line
@@ -117,9 +118,9 @@ class BERTDataset(Dataset):
             self.unique_turns = []
             self.unique_turns_text = []
             for t in self.all_turns:
-                if t['clean_text'] not in unique_turns_text:
-                    unique_turns.append(t)
-                    unique_turns_text.append(t['clean_text'])
+                if t['clean_text'] not in self.unique_turns_text:
+                    self.unique_turns.append(t)
+                    self.unique_turns_text.append(t['clean_text'])
         else:
             self.unique_turns = list(set(self.all_turns))
 
