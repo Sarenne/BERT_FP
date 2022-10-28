@@ -58,12 +58,23 @@ class BERTDataset(Dataset):
         crsets = pickle.load(file=open(corpus_path, 'rb'))
         cnt=0 # track the number of lines that aren't used  
         lcnt=0 # track the number of short documents ? 
+        
+        # Check if the loaded dataset contains meta info (each line is a dict) or not (each line is str)
+        if type(crsets[0][0]) == dict:
+            self.meta = True
+        
         for crset in tqdm(crsets): # for each document in corpus, create a list of turns as strings + samples
             for line in crset:
-                if len(line) == 0:
+                # Get the text from the line
+                if meta:
+                    l_text = line['clean_text']
+                else:
+                    l_text = line
+              
+                if len(l_text) == 0:
                     continue
-                if len(line) < 10:
-                    if len(self.tokenizer.tokenize(line)) == 0:
+                if len(l_text) < 10:
+                    if len(self.tokenizer.tokenize(l_text)) == 0:
                         cnt += 1
                         continue
                 sample = {"doc_id": len(self.all_docs),
@@ -74,7 +85,6 @@ class BERTDataset(Dataset):
                 self.sample_to_doc.append(sample)
                 doc.append(line)
                 
-
             if (len(doc) != 0):
                 self.all_docs.append(doc)
             else:
@@ -103,7 +113,15 @@ class BERTDataset(Dataset):
                 print("problem")
 
         self.all_turns = [t for conv in self.all_docs for t in conv]
-        self.unique_turns = list(set(self.all_turns))
+        if self.meta:
+            self.unique_turns = []
+            self.unique_turns_text = []
+            for t in self.all_turns:
+                if t['clean_text'] not in unique_turns_text:
+                    unique_turns.append(t)
+                    unique_turns_text.append(t['clean_text'])
+        else:
+            self.unique_turns = list(set(self.all_turns))
 
     def __len__(self):
         return len(self.sample_to_doc)
@@ -118,8 +136,13 @@ class BERTDataset(Dataset):
                 tokens_a = []
                 context = []
                 for i in range(length - 1):
-                    tokens_a+=self.tokenizer.tokenize(self.all_docs[sample["doc_id"]][i])+[self.tokenizer.eos_token]
-                    context.append(self.all_docs[sample["doc_id"]][i])
+                    line = self.all_docs[sample["doc_id"]][i]
+                    if self.meta:
+                        text = line['clean_text']
+                    else:
+                        text = line
+                    tokens_a+=self.tokenizer.tokenize(line)+[self.tokenizer.eos_token]
+                    context.append(line)
                 tokens_a.pop()
 
                 #response = self.all_docs[sample["doc_id"]][sample["line"] + length - 1]
@@ -140,8 +163,12 @@ class BERTDataset(Dataset):
                     #random utterace
                     response = self.get_random_line(sample)
                     is_next_label = 0
-
-                tokens_b = self.tokenizer.tokenize(response)
+                
+                if self.meta:
+                    r_text = response['clean_text']
+                else:
+                    r_text = response
+                tokens_b = self.tokenizer.tokenize(r_text)
                 # used later to avoid random nextSentence from same doc
                 if not tokenize_output:
                     return context, response, is_next_label
@@ -155,8 +182,18 @@ class BERTDataset(Dataset):
                     return [t1, t2, t3], t4, is_next_label
 
                 # tokenize
-                tokens_a = self.tokenizer.tokenize(t1)+[self.tokenizer.eos_token]+self.tokenizer.tokenize(t2)+[self.tokenizer.eos_token]+self.tokenizer.tokenize(t3)
-                tokens_b = self.tokenizer.tokenize(t4)
+                if self.meta:
+                    t1t = t1['clean_text']
+                    t2t = t2['clean_text']
+                    t3t = t3['clean_text']
+                    t4t = t4['clean_text']
+                else:
+                    t1t = t1
+                    t2t = t2
+                    t3t = t3
+                    t4t = t4
+                tokens_a = self.tokenizer.tokenize(t1t)+[self.tokenizer.eos_token]+self.tokenizer.tokenize(t2t)+[self.tokenizer.eos_token]+self.tokenizer.tokenize(t3t)
+                tokens_b = self.tokenizer.tokenize(t4t)
 
             # combine to one sample
             cur_example = InputExample(tokens_a=tokens_a, tokens_b=tokens_b, is_next=is_next_label)
@@ -226,7 +263,6 @@ class BERTDataset(Dataset):
             rand_doc_idx = random.randint(0, len(self.all_docs)-1)
             if sample["doc_id"]!=rand_doc_idx:
                 break
-
 
         rand_doc = self.all_docs[rand_doc_idx]
         line = rand_doc[random.randrange(len(rand_doc))]
