@@ -296,7 +296,8 @@ class BERTDataset(Dataset):
 
         # Remove response sample text from sample_turns
         response_text = self.all_docs[response_sample["doc_id"]][response_sample["line"]]
-        sample_turns.remove(response_text)
+        if response_text in sample_turns:
+            sample_turns.remove(response_text)
 
         # Remove context turns from sample_turns
         if remove_context:
@@ -305,7 +306,8 @@ class BERTDataset(Dataset):
             t3_text = self.all_docs[response_sample["doc_id"]][response_sample["line"] - 1]
 
             for t in [t1_text, t2_text, t3_text]:
-                sample_turns.remove(t)
+                if t in sample_turns:
+                    sample_turns.remove(t)
 
         # Choose some random lines
         np.random.seed(int(str(response_sample["doc_id"])+str(response_sample["line"]))) # comment for unseeded, so that it selects different things!!
