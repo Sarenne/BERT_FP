@@ -101,6 +101,7 @@ else:
     from BERT_finetuning import NeuralNetwork
 
 def train_model(train, dev):
+    print('TRAINING MODEL')
     model = NeuralNetwork(args=args)
 
     import IPython
@@ -110,10 +111,9 @@ def train_model(train, dev):
 
 
 def test_model(test):
+    print('TESTING MODEL')
     model = NeuralNetwork(args=args)
     model.load_model(args.save_path)   
-    import IPython
-    IPython.embed()
     model.evaluate(test, is_test=True)
 
 

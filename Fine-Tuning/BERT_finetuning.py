@@ -95,7 +95,6 @@ def convert_examples_to_features(item, train, bert_tokenizer):
     ex_index = item
     input_ids = train['cr'][item]
 
-
     sep = input_ids.index(bert_tokenizer.sep_token_id)
     context = input_ids[:sep]
     response = input_ids[sep + 1:]
