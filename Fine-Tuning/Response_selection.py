@@ -12,6 +12,8 @@ os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 
 #Dataset path.
 FT_data={
+    'switchboard_nxt': 'spoken_data/switchboard_nxt_dataset_samples.pkl',
+    'switchboard_ttd_nxt': 'spoken_data/switchboard_ttd_nxt_dataset_samples.pkl',
     'switchboard' : 'spoken_data/switchboard_dataset_samples.pkl',
     'ubuntu': 'ubuntu_data/ubuntu_dataset_1M.pkl',
     'douban': 'douban_data/douban_dataset_1M.pkl',
