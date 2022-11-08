@@ -195,13 +195,12 @@ class NeuralNetwork(nn.Module):
         with torch.no_grad():
             batch_ids, batch_mask, batch_seg, batch_y, batch_len = (item.cuda(device=self.device) for item in data)
 
-        self.optimizer.zero_grad()
+        # self.optimizer.zero_grad()
         output = self.bert_model(batch_ids, batch_mask, batch_seg)
         logits = torch.sigmoid(output[0])
         loss = self.loss_func(logits.squeeze(), target=batch_y)
-        loss.backward()
-
-        self.optimizer.step()
+        # loss.backward()
+        # self.optimizer.step()
 
         if i % 1000 == 0:
             print('Batch[{}] - loss: {:.6f}  batch_size:{}'.format(i, loss.item(),
@@ -227,12 +226,20 @@ class NeuralNetwork(nn.Module):
 
         losses = []
         v_results = []
+        
+        # Accumulate gradients (if required)
+        if self.args.true_batch_size:
+            accum_steps = self.args.true_batch_size // self.args.batch_size
+        else:
+            accum_steps = 1
+        print(f'Accumulating gradients over {accum_steps} batches')
 
         for epoch in range(self.args.epochs):
             print("\nEpoch ", epoch + 1, "/", self.args.epochs)
             avg_loss = 0
 
             self.train()
+            self.optimizer.zero_grad()
             for i, data in tqdm(enumerate(dataloader)): 
                 if epoch >= 2 and self.patience >= 3:
                     print("Reload the best model...")
@@ -241,6 +248,11 @@ class NeuralNetwork(nn.Module):
                     self.patience = 0
 
                 loss = self.train_step(i, data)
+                loss = loss / accum_steps     # Normalize our loss (if averaged)
+                loss.backward()                      # Backward pass
+                if (i+1) % accum_steps == 0:         # Wait for several backward steps
+                    self.optimizer.step()            # Now we can do an optimizer step
+                    self.optimizer.zero_grad() 
 
                 if self.init_clip_max_norm is not None:
                     utils.clip_grad_norm_(self.parameters(), max_norm=self.init_clip_max_norm)
@@ -253,10 +265,10 @@ class NeuralNetwork(nn.Module):
             eval_result = self.evaluate(dev)
             v_results.append(eval_result)
         
-        loss_list = {'train': losses, 'val': v_results}
-        print(f'Losses: {loss_list}')
-        with open(f'{self.args.save_path}-data_losses.json', 'w') as fp:
-            json.dump(loss_list, fp)
+            loss_list = {'train': losses, 'val': v_results}
+            print(f'Losses: {loss_list}')
+            with open(f'{self.args.save_path}-data_losses.json', 'w') as fp:
+                json.dump(loss_list, fp)
 
     def adjust_learning_rate(self, decay_rate=.5):
         for param_group in self.optimizer.param_groups:
