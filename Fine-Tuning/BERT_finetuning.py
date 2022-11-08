@@ -14,6 +14,8 @@ import torch.nn.functional as F
 import json
 
 FT_model={
+    'switchboard_nxt': 'bert-base-uncased',
+    'switchboard_ttd_nxt': 'bert-base-uncased', 
     'switchboard': 'bert-base-uncased',
     'ubuntu': 'bert-base-uncased',
     'douban': 'bert-base-chinese',
@@ -169,7 +171,7 @@ class NeuralNetwork(nn.Module):
         """You can load the post-trained checkpoint here."""
         if args.checkpoint_path:
             self.bert_model.bert.load_state_dict(state_dict=torch.load(args.checkpoint_path))
-            print(f'Loaded BERT from checkpoint ({checkpoint_bert_path})')
+            print(f'Loaded BERT from checkpoint ({args.checkpoint_path})')
         # self.bert_model.bert.load_state_dict(state_dict=torch.load("./post-train/ubuntu25/bert.pt"))
         # self.bert_model.bert.load_state_dict(state_dict=torch.load("./FPT/PT_checkpoint/ubuntu25/bert.pt"))
         #self.bert_model.bert.load_state_dict(state_dict=torch.load("./FPT/PT_checkpoint/douban27/bert.pt"))
@@ -178,7 +180,7 @@ class NeuralNetwork(nn.Module):
         self.bert_model = self.bert_model.cuda()
 
         """ Freeze layers here """
-        unfreeze = ['classifier', 'pooler', '11', '10', '9', '8']
+        unfreeze = ['bert_model', 'classifier', 'pooler', '11', '10', '9', '8']
         for name, param in self.named_parameters():
             if any([ll in name for ll in unfreeze]): 
                 param.requires_grad = True
