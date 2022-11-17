@@ -49,25 +49,28 @@ class BERTDataset(Dataset):
         self.seq_len = seq_len
         self.corpus_path = corpus_path
         self.encoding = encoding
+        self.conv_to_doc = {}
         self.sample_to_doc = [] # map sample index to doc and line that have been filtered (empty/length)
         self.all_docs = [] # raw documents; list of lists (docs are lists of utterances)
         self.all_turns = []
         doc = [] # list of utterances in a document 
 
         crsets = pickle.load(file=open(corpus_path, 'rb'))
+        crsets = [c for c in crsets if len(c) > 1]
         cnt=0 # track the number of lines that aren't used  
         lcnt=0 # track the number of short documents ? 
         
         # Check if the loaded dataset contains meta info (each line is a dict) or not (each line is str)
         self.meta = False
         if type(crsets[0][0]) == dict:
-            self.meta = True
-        
+            self.meta = True        
+
         for crset in tqdm(crsets): # for each document in corpus, create a list of turns as strings + samples
             for line in crset:
                 # Get the text from the line
                 if self.meta:
                     l_text = line['clean_text']
+                    self.conv_to_doc[line['conv_id']] = len(self.all_docs)
                 else:
                     l_text = line
               
@@ -128,6 +131,7 @@ class BERTDataset(Dataset):
 
     def __getitem__(self, item, tokenize_output=True):
         sample = self.sample_to_doc[item]
+        # doc_id = self.conv_to_doc[sample["doc_id"]]
         length = sample['end']
 
         try:
@@ -208,6 +212,7 @@ class BERTDataset(Dataset):
                            torch.tensor(cur_features.is_next))
 
         except:
+            print(f'Error with item {item}: {sample}\n {self.all_docs[sample["doc_id"]]}')
             import IPython
             IPython.embed()
 
@@ -293,7 +298,7 @@ class BERTDataset(Dataset):
         # Turns to sample from
         sample_turns = self.unique_turns.copy()
 
-        # Remove response sample text from sample_turns
+        # Remove response sample text from sample_turn
         response_text = self.all_docs[response_sample["doc_id"]][response_sample["line"]]
         if response_text in sample_turns:
             sample_turns.remove(response_text)
