@@ -69,7 +69,7 @@ class DiscriminationDataset(BERTDataset):
       
     def make_acceptable_contexts(self):
         """Return (and set) acceptable context turns (ie, turns that can end a context)"""
-        acceptable_turns = [t for t in tqdm(self.all_turns) if acceptable_context_turn(self, t)]
+        acceptable_turns = [t for t in tqdm(self.all_turns) if self.acceptable_context_turn(t)]
         return acceptable_turns 
       
     def acceptable_response(self, turn, context_turn):
@@ -125,7 +125,7 @@ class DiscriminationDataset(BERTDataset):
             dfs
         """
 
-        all_acceptable_responses = [t for t in self.all_turns if acceptable_response(self, t, context_turn)]
+        all_acceptable_responses = [t for t in self.all_turns if self.acceptable_response(t, context_turn)]
 
         # Sample responses with the same string (not implemented)
         # if utter:
@@ -191,7 +191,7 @@ class DiscriminationDataset(BERTDataset):
         lines = [response]
 
         # Get negative responses
-        neg_responses = sample_acceptable_responses(self, t3, num_negs)
+        neg_responses = self.sample_acceptable_responses(t3, num_negs)
         tokens_bs = [self.tokenizer.tokenize(response_text)]    
         for n in neg_responses:
             lines.append(n)
