@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 class DiscriminationDataset(BERTDataset):
     def __init__(self, corpus_path, tokenizer, 
-                 min_context_turns=3, max_tokens=50, min_context_s=2, max_context_s=10, min_context_turn=5, max_context_turn=5, 
+                 min_context_tokens=3, max_context_tokens=50, min_context_s=2, max_context_s=10, min_context_turn=5, max_context_turn=5, 
                  min_response_s=0.25, max_response_s=10,
                 ):
         super(DiscriminationDataset, self).__init__(corpus_path, tokenizer, seq_len=240)
@@ -21,8 +21,8 @@ class DiscriminationDataset(BERTDataset):
         self.acceptable_context_turns = self.make_acceptable_contexts()
         
         # Args for acceptable contexts + responses
-        self.min_context_turns = min_context_turns
-        self.max_context_turns = max_context_turns
+        self.min_context_tokens = min_context_tokens
+        self.max_context_tokens = max_context_tokens
         self.min_context_s = min_context_s
         self.max_context_s = max_context_s
         self.min_context_turn = min_context_turn
@@ -40,7 +40,7 @@ class DiscriminationDataset(BERTDataset):
         
         # Filter for token length (ignore contexts that are too short/long to listen to)
         num_tokens = len(turn['clean_text'].split(' '))
-        if num_tokens < self.min_context_turns or num_tokens > self.max_context_turns:
+        if num_tokens < self.min_context_tokens or num_tokens > self.max_context_tokens:
             return False
 
         # Filter for audio length (ignore contexts that are too short/long to listen to)
