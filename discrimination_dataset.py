@@ -18,7 +18,6 @@ class DiscriminationDataset(BERTDataset):
                 ):
         super(DiscriminationDataset, self).__init__(corpus_path, tokenizer, seq_len=240)
         # NOTE seq_len is hard coded from base args in BERTFP
-        self.acceptable_context_turns = self.make_acceptable_contexts()
         
         # Args for acceptable contexts + responses
         self.min_context_tokens = min_context_tokens
@@ -29,6 +28,8 @@ class DiscriminationDataset(BERTDataset):
         self.max_context_turn = max_context_turn
         self.min_response_s = min_response_s
         self.max_response_s = max_response_s
+        
+        self.acceptable_context_turns = self.make_acceptable_contexts()
         
       
     def acceptable_context_turn(self, turn, ):
