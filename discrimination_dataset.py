@@ -1,4 +1,6 @@
 from FPT.swb_final import BERTDataset
+
+import numpy as np
 from tqdm import tqdm
 
 # class Subclass(Superclass):
@@ -51,9 +53,11 @@ class DiscriminationDataset(BERTDataset):
 
         # Filter for turn position (ignore contexts from beginning and end of conversations as these might be conventionalised)
         min_turn_id = self.min_context_turn
+        if turn['turn_id'] < min_turn_id:
+            return False
         num_conv_turns = max([c['turn_id'] for c in self.all_turns if c['conv_id'] == turn['conv_id']])
         max_turn_id = num_conv_turns - self.max_context_turn
-        if turn['turn_id'] > max_turn_id or turn['turn_id'] < min_turn_id:
+        if turn['turn_id'] > max_turn_id:
             return False
 
         # Filter for response length
@@ -166,6 +170,9 @@ class DiscriminationDataset(BERTDataset):
         # Get the context (an acceptable last turn)
         sample = self.acceptable_context_turns[item]
         doc_id = self.conv_to_doc[sample["conv_id"]]
+
+        print(sample)
+        print(self.all_docs[doc_id][sample["turn_id"]])
 
         t1 = self.all_docs[doc_id][sample["turn_id"] - 2]
         t2 = self.all_docs[doc_id][sample["turn_id"] - 1]
