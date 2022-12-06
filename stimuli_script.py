@@ -136,20 +136,18 @@ def make_bertfp_stimuli_df(n_samples, n_responses, reverse,
                                                                  reverse=reverse
                                                                 )
 
+        # Get the true response
         target_id = np.argwhere(sort_ids == 0)[0][0]
+        target_response = top_lines[target_id]
         target_score = top_scores[target_id]
 
-        # Return the top(n_response) negatives and the target response
+        # Return the top(n_response) negatives (excluding the true response)
         num_responses = n_responses - 1
         if target_id <= n_responses: # if the target is in top[n_responses], add an extra!
             num_responses += 1
 
         neg_lines = [response_lines[i] for i in sort_ids[:num_responses] if i != 0]
         neg_scores = [y_pred[i] for i in sort_ids[:num_responses] if i != 0]
-
-        target_id = np.argwhere(sort_ids == 0)[0][0]
-        target_response = response_lines[target_id]
-        target_score = top_scores[target_id]
 
         # Make rows in grid_df
         context_text, context_print = print_context(context_lines)
@@ -185,7 +183,7 @@ def make_bertfp_stimuli_df(n_samples, n_responses, reverse,
                 'target': 0,
                 'response_score': neg_scores[i]
                     }
-            row = {**c_row, **t_row,}
+            row = {**c_row, **r_row,}
             grid_df = grid_df.append(row, ignore_index=True)
 
     return grid_df
@@ -252,17 +250,17 @@ if __name__ == "__main__":
 
 
     """make "stimuli "grid"""
-    grid_df = make_bertfp_stimuli_df(20, 5, False,
+    grid_df = make_bertfp_stimuli_df(250, 5, False,
                                      dataset=discrim_dataset, corpus=wts_corpus, model=model, tokenizer=tokenizer,
-                                     n_negs=100-1, columns=COLS, sample_seed=123, max_grid_size=100
+                                     n_negs=1000-1, columns=COLS, sample_seed=123, max_grid_size=100
                               )
     
     grid_df.to_csv('tpm_bertfp_grid.csv')
 
     """make 'check' grid"""
-    check_df = make_bertfp_stimuli_df(10, 5, True,
+    check_df = make_bertfp_stimuli_df(20, 5, True,
                                      dataset=discrim_dataset, corpus=wts_corpus, model=model, tokenizer=tokenizer,
-                                     n_negs=100-1, columns=COLS, sample_seed=123, max_grid_size=100
+                                     n_negs=1000-1, columns=COLS, sample_seed=123, max_grid_size=100
                               )
     check_df.to_csv('tmp_check_grid.csv')
     import IPython
