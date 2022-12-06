@@ -171,8 +171,8 @@ class DiscriminationDataset(BERTDataset):
         sample = self.acceptable_context_turns[item]
         doc_id = self.conv_to_doc[sample["conv_id"]]
 
-        print(sample)
-        print(self.all_docs[doc_id][sample["turn_id"]])
+        # print(sample)
+        # print(self.all_docs[doc_id][sample["turn_id"]])
 
         t1 = self.all_docs[doc_id][sample["turn_id"] - 2]
         t2 = self.all_docs[doc_id][sample["turn_id"] - 1]
