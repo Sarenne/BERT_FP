@@ -32,14 +32,9 @@ class DiscriminationDataset(BERTDataset):
         self.max_response_s = max_response_s
         
         self.acceptable_context_turns = self.make_acceptable_contexts()
+        self.acceptable_responses = self.make_acceptable_responses()
         
-      
-    def acceptable_context_turn(self, turn, ):
-#                                 min_tokens=3, max_tokens=50, 
-#                                 min_s=2, max_s=10,
-#                                 min_turn=5, max_turn=5, 
-#                                 min_response_s=0.25, max_response_s=10,
-#                                ): 
+    def acceptable_context_turn(self, turn):
         
         # Filter for token length (ignore contexts that are too short/long to listen to)
         num_tokens = len(turn['clean_text'].split(' '))
@@ -79,6 +74,8 @@ class DiscriminationDataset(BERTDataset):
       
     def acceptable_response(self, turn, context_turn):
         """
+        Original acceptability check (replaced to avoid running checks repeatedly)
+
         Return true/false if given turn meets some acceptability criteria 
         - Must be longer than a certain length
         - Pause length: must to be shorter than the preceeding context turn (avoid total overlap)
@@ -114,6 +111,86 @@ class DiscriminationDataset(BERTDataset):
             print(e)
             return False
         return True
+
+    def acceptable_response_isolated(self, turn):
+        """
+        Check the acceptability conditions for a response that only depend on the isoalted response (ie, not the context). 
+        Making acceptability a 2 step process so that we don't have to find the previous turn for all responses multiple times.
+
+        Return true/false if given turn meets some acceptability criteria 
+        - Must be longer than a certain length
+        - Pause length: must to be shorter than the preceeding context turn (avoid total overlap)
+        - Speaker ID: shouldn't be from the same speaker as context turn
+
+        Args:
+            self (BERTDataset): (needed to get the pause preceeding the turn)
+            context turn (dict): the context utterance that turn could be joined with
+        Return:
+            (bool) : acceptability of turn as a response wrt context_turn
+        """
+
+        # Needs a preceeding turn to compute associated pause length
+        if turn['turn_id'] == 0:
+            return False
+
+        # Check audio length
+        turn_len = turn['stop'] - turn['start']
+        if turn_len > self.max_response_s or turn_len < self.min_response_s:
+            return False
+
+
+        # # Make sure it's not from the same speaker
+        # if (turn['conv_id'] == context_turn['conv_id']) and (turn['speaker'] == context_turn['speaker']):
+        #     return False
+
+        # # Make sure previous pause is not longer than the context turn audio
+        # try:
+        #     prev_turn = next(t for t in self.all_turns if (t['conv_id'] == turn['conv_id']) and (t['turn_id'] == turn['turn_id'] - 1))
+        #     pause = turn['start'] - prev_turn['stop']
+        #     if pause > (context_turn['stop'] - context_turn['start']):
+        #         return False
+        # except Exception as e: 
+        #     print(e)
+        #     return False
+
+        # Broad pause check; pause must not be longer than the shortest possible context audio
+        try:
+            prev_turn = next(t for t in self.all_turns if (t['conv_id'] == turn['conv_id']) and (t['turn_id'] == turn['turn_id'] - 1))
+            pause = turn['start'] - prev_turn['stop']
+            if pause > self.min_context_s: 
+                return False
+        except Exception as e: 
+            print(e)
+            return False
+
+        return True
+
+    def acceptable_response_context(self, turn, context_turn):
+        """
+        Make a 2 step process so that we don't have to find the previous turn for all responses multiple times.
+
+        Return true/false if given turn meets some acceptability criteria 
+        - Must be longer than a certain length
+        - Pause length: must to be shorter than the preceeding context turn (avoid total overlap)
+        - Speaker ID: shouldn't be from the same speaker as context turn
+
+        Args:
+            self (BERTDataset): (needed to get the pause preceeding the turn)
+            context turn (dict): the context utterance that turn could be joined with
+        Return:
+            (bool) : acceptability of turn as a response wrt context_turn
+        """
+
+        # Make sure it's not from the same speaker
+        if (turn['conv_id'] == context_turn['conv_id']) and (turn['speaker'] == context_turn['speaker']):
+            return False
+
+        return True
+
+    def make_acceptable_responses(self):
+        """Return (and set) acceptable responses (ie, perform the response-specific checks once)"""
+        acceptable_responses = [t for t in tqdm(self.all_turns) if self.acceptable_response_isolated(t)]
+        return acceptable_responses 
     
     def sample_acceptable_responses(self, context_turn, n, utter=None):
         """
@@ -130,7 +207,7 @@ class DiscriminationDataset(BERTDataset):
             dfs
         """
 
-        all_acceptable_responses = [t for t in self.all_turns if self.acceptable_response(t, context_turn)]
+        all_acceptable_responses = [t for t in self.acceptable_responses if self.acceptable_response_context(t, context_turn)]
 
         # Sample responses with the same string (not implemented)
         # if utter:
@@ -239,51 +316,3 @@ def select_neighbours(preds, ids, lines, n, subset=None, reverse=False):
     
     return [preds[s] for s in sort_ids[:n]], [ids[s] for s in sort_ids[:n]], [lines[s] for s in sort_ids[:n]],  sort_ids
     
-    
-# def convert_to_string(ids, tokenizer=tokenizer):
-#     """Clean up tokens for printing"""
-#     string = ' '.join(tokenizer.convert_ids_to_tokens(ids))
-#     string = string.replace(" ' ", "'")
-#     string = string.replace(" ##", "")
-#     return string
-
-
-# def convert_to_context_response(ids, tokenizer=tokenizer):
-#     """Clean up context, response for printing"""
-#     string = convert_to_string(ids, tokenizer)
-#     cr = string.split(' [SEP] ')
-#     return cr[0], cr[1]
-        
-#     def show_experiment(dataset, corpus, sample_id, n_negs=500-1, model=model, reverse=False):
-
-#     tokenized_samples, ys, lines = make_unique_ft_sample(dataset, sample_id, n_negs)
-#     context_lines, response_lines = lines
-#     y_pred = model.predict({'cr':tokenized_samples, 'y':ys}, pred_batch_size=100)
-
-#     print(y_pred[0])
-#     # Let's print some! (version 2; this one uses the stored lines and they're the same)
-#     sids = np.argsort(y_pred)
-#     top_scores, top_ids, top_lines, sort_ids = select_neighbours(y_pred, tokenized_samples, 
-#                                                                  response_lines, 500, 
-#                                                                  reverse=reverse
-#                                                                 )
-
-# def show_experiment(dataset, corpus, sample_id, n_negs=500-1, model=model, reverse=False):
-
-#     tokenized_samples, ys, lines = make_unique_ft_sample(dataset, sample_id, n_negs)
-#     context_lines, response_lines = lines
-#     y_pred = model.predict({'cr':tokenized_samples, 'y':ys}, pred_batch_size=100)
-
-#     print(y_pred[0])
-#     # Let's print some! (version 2; this one uses the stored lines and they're the same)
-#     sids = np.argsort(y_pred)
-#     top_scores, top_ids, top_lines, sort_ids = select_neighbours(y_pred, tokenized_samples, 
-#                                                                  response_lines, 500, 
-#                                                                  reverse=reverse
-#                                                                 )
-
-#     target_id = np.argwhere(sort_ids == 0)[0][0]
-#     target_score = top_scores[target_id]
-       
-
-  
