@@ -115,18 +115,18 @@ COLS = [
 
 def make_bertfp_stimuli_df(n_samples, n_responses, reverse,
                            dataset, corpus, model, tokenizer, 
-                           n_negs=500-1, indxs_to_ignore=[],
+                           n_negs=500-1, idxs_to_ignore=[],
                            columns=COLS, sample_seed=123, q_id_str=''
                           ):
     """Fill grid_df with contexts and responses"""
     grid_df = pd.DataFrame(columns=columns)
 
     # Select some random context indices
-    all_indxs = list(range(len(dataset.acceptable_context_turns)))
-    if indxs_to_ignore:
-	all_indxs = list(set(all_indxs).difference(set(indxs_to_ignore)))
+    all_idxs = list(range(len(dataset.acceptable_context_turns)))
+    if len(idxs_to_ignore) > 0:
+        all_idxs = list(set(all_idxs).difference(set(idxs_to_ignore)))
     np.random.seed(sample_seed)
-    idxs = np.random.choice(all_indxs, n_samples, replace=False)
+    idxs = np.random.choice(all_idxs, n_samples, replace=False)
 
     for sample_id in tqdm(idxs):
         # Make a (context, responses) BERT-FP sample
@@ -134,24 +134,38 @@ def make_bertfp_stimuli_df(n_samples, n_responses, reverse,
         context_lines, response_lines = lines
         y_pred = model.predict({'cr':tokenized_samples, 'y':ys}, pred_batch_size=100)
 
-        sids = np.argsort(y_pred)
-        top_scores, top_ids, top_lines, sort_ids = select_neighbours(y_pred, tokenized_samples,
-                                                                 response_lines, n_negs+1,
-                                                                 reverse=reverse
-                                                                )
+        # sids = np.argsort(y_pred)
+        # top_scores, top_ids, top_lines, sort_ids = select_neighbours(y_pred, tokenized_samples,
+        #                                                             response_lines, n_negs+1,
+        #                                                             reverse=reverse
+        #                                                              )
+
+        # # Get the true response
+        # target_id = np.argwhere(sort_ids == 0)[0][0]
+        # target_response = top_lines[target_id]
+        # target_score = top_scores[target_id]
+
+        # # Return the top(n_response) negatives (excluding the true response)
+        # num_responses = n_responses - 1
+        # if target_id < n_responses: # if the target is in top[n_responses], add an extra!
+        #     num_responses += 1
+
+        # neg_lines = [response_lines[i] for i in sort_ids[:num_responses] if i != 0]
+        # neg_scores = [y_pred[i] for i in sort_ids[:num_responses] if i != 0]
 
         # Get the true response
-        target_id = np.argwhere(sort_ids == 0)[0][0]
-        target_response = top_lines[target_id]
-        target_score = top_scores[target_id]
+        target_response = response_lines[0]
+        target_score = y_pred[0]
 
-        # Return the top(n_response) negatives (excluding the true response)
-        num_responses = n_responses - 1
-        if target_id < n_responses: # if the target is in top[n_responses], add an extra!
-            num_responses += 1
-
-        neg_lines = [response_lines[i] for i in sort_ids[:num_responses] if i != 0]
-        neg_scores = [y_pred[i] for i in sort_ids[:num_responses] if i != 0]
+        # Return the top n_response negatives
+        neg_response_lines = response_lines[1:]
+        neg_y_pred = y_pred[1:]
+        if reverse:
+            sort_ids = np.argsort(neg_y_pred)
+        else:
+            sort_ids = np.argsort(neg_y_pred)[::-1]
+        neg_lines = [neg_response_lines[x] for x in sort_ids[:n_responses - 1]]
+        neg_scores = [neg_y_pred[x] for x in sort_ids[:n_responses - 1]]
 
         # Make rows in grid_df
         context_text, context_print = print_context(context_lines)
@@ -190,7 +204,7 @@ def make_bertfp_stimuli_df(n_samples, n_responses, reverse,
             row = {**c_row, **r_row,}
             grid_df = grid_df.append(row, ignore_index=True)
 
-    return grid_df, indxs
+    return grid_df, idxs
 
 
 if __name__ == "__main__":
@@ -252,20 +266,20 @@ if __name__ == "__main__":
         discrim_dataset = pickle.load(fp)
 
     """make 'check' grid"""
-    check_df, check_indxs = make_bertfp_stimuli_df(
+    check_df, check_idxs = make_bertfp_stimuli_df(
 				     25, 5, True,
                                      dataset=discrim_dataset, corpus=wts_corpus, model=model, tokenizer=tokenizer,
                                      n_negs=1000-1, columns=COLS, sample_seed=123, q_id_str='_check',
                               			  )
-    check_df.to_csv('tmp_check_grid.csv')
+    check_df.to_csv('tmp_check_grid_25.csv')
 
     """make "stimuli "grid"""
-    grid_df, stimuli_indxs = make_bertfp_stimuli_df(
+    grid_df, stimuli_idxs = make_bertfp_stimuli_df(
 				     250, 5, False,
                                      dataset=discrim_dataset, corpus=wts_corpus, model=model, tokenizer=tokenizer,
-                                     n_negs=1000-1, indxs_to_ignore=check_indxs, columns=COLS, sample_seed=123,
+                                     n_negs=1000-1, idxs_to_ignore=check_idxs, columns=COLS, sample_seed=123,
                                			     )
-    grid_df.to_csv('tmp_bertfp_grid.csv')
+    grid_df.to_csv('tmp_bertfp_grid_250.csv')
     import IPython
     IPython.embed()
 
