@@ -114,15 +114,19 @@ COLS = [
         ]
 
 def make_bertfp_stimuli_df(n_samples, n_responses, reverse,
-                           dataset, corpus, model, tokenizer, n_negs = 500-1,
-                           columns=COLS, sample_seed=123, max_grid_size=100,
+                           dataset, corpus, model, tokenizer, 
+                           n_negs=500-1, indxs_to_ignore=[],
+                           columns=COLS, sample_seed=123, q_id_str=''
                           ):
     """Fill grid_df with contexts and responses"""
     grid_df = pd.DataFrame(columns=columns)
 
     # Select some random context indices
+    all_indxs = list(range(len(dataset.acceptable_context_turns)))
+    if indxs_to_ignore:
+	all_indxs = list(set(all_indxs).difference(set(indxs_to_ignore)))
     np.random.seed(sample_seed)
-    idxs = np.random.choice(range(len(dataset.acceptable_context_turns)), n_samples, replace=False)
+    idxs = np.random.choice(all_indxs, n_samples, replace=False)
 
     for sample_id in tqdm(idxs):
         # Make a (context, responses) BERT-FP sample
@@ -132,7 +136,7 @@ def make_bertfp_stimuli_df(n_samples, n_responses, reverse,
 
         sids = np.argsort(y_pred)
         top_scores, top_ids, top_lines, sort_ids = select_neighbours(y_pred, tokenized_samples,
-                                                                 response_lines, 500,
+                                                                 response_lines, n_negs+1,
                                                                  reverse=reverse
                                                                 )
 
@@ -143,7 +147,7 @@ def make_bertfp_stimuli_df(n_samples, n_responses, reverse,
 
         # Return the top(n_response) negatives (excluding the true response)
         num_responses = n_responses - 1
-        if target_id <= n_responses: # if the target is in top[n_responses], add an extra!
+        if target_id < n_responses: # if the target is in top[n_responses], add an extra!
             num_responses += 1
 
         neg_lines = [response_lines[i] for i in sort_ids[:num_responses] if i != 0]
@@ -151,7 +155,7 @@ def make_bertfp_stimuli_df(n_samples, n_responses, reverse,
 
         # Make rows in grid_df
         context_text, context_print = print_context(context_lines)
-        context_id = f"{context_lines[-1]['conv_id']}_{context_lines[-1]['turn_id']}"
+        context_id = f"{context_lines[-1]['conv_id']}_{context_lines[-1]['turn_id']}{q_id_str}"
         c_row = {
             'context_text': context_text,
             'context_print': context_print,
@@ -186,7 +190,7 @@ def make_bertfp_stimuli_df(n_samples, n_responses, reverse,
             row = {**c_row, **r_row,}
             grid_df = grid_df.append(row, ignore_index=True)
 
-    return grid_df
+    return grid_df, indxs
 
 
 if __name__ == "__main__":
@@ -247,22 +251,21 @@ if __name__ == "__main__":
     with open("/disk/scratch/swallbridge/pickles/wts_dataset.p", 'rb' ) as fp:
         discrim_dataset = pickle.load(fp)
 
-
+    """make 'check' grid"""
+    check_df, check_indxs = make_bertfp_stimuli_df(
+				     25, 5, True,
+                                     dataset=discrim_dataset, corpus=wts_corpus, model=model, tokenizer=tokenizer,
+                                     n_negs=1000-1, columns=COLS, sample_seed=123, q_id_str='_check',
+                              			  )
+    check_df.to_csv('tmp_check_grid.csv')
 
     """make "stimuli "grid"""
-    grid_df = make_bertfp_stimuli_df(250, 5, False,
+    grid_df, stimuli_indxs = make_bertfp_stimuli_df(
+				     250, 5, False,
                                      dataset=discrim_dataset, corpus=wts_corpus, model=model, tokenizer=tokenizer,
-                                     n_negs=1000-1, columns=COLS, sample_seed=123, max_grid_size=100
-                              )
-    
-    grid_df.to_csv('tpm_bertfp_grid.csv')
-
-    """make 'check' grid"""
-    check_df = make_bertfp_stimuli_df(20, 5, True,
-                                     dataset=discrim_dataset, corpus=wts_corpus, model=model, tokenizer=tokenizer,
-                                     n_negs=1000-1, columns=COLS, sample_seed=123, max_grid_size=100
-                              )
-    check_df.to_csv('tmp_check_grid.csv')
+                                     n_negs=1000-1, indxs_to_ignore=check_indxs, columns=COLS, sample_seed=123,
+                               			     )
+    grid_df.to_csv('tmp_bertfp_grid.csv')
     import IPython
     IPython.embed()
 
