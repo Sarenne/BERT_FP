@@ -181,9 +181,10 @@ class DiscriminationDataset(BERTDataset):
             (bool) : acceptability of turn as a response wrt context_turn
         """
 
-        # Make sure it's not from the same speaker
-        if (turn['conv_id'] == context_turn['conv_id']) and (turn['speaker'] == context_turn['speaker']):
-            return False
+        # Make sure it's not from the same speaker or the upcoming turn
+        if (turn['conv_id'] == context_turn['conv_id']):
+            if (turn['turn_id'] - 1 == context_turn['turn_id']) or (turn['speaker'] == context_turn['speaker']):
+                return False
 
         return True
 
@@ -196,7 +197,8 @@ class DiscriminationDataset(BERTDataset):
         """
         Return n acceptable responses wrt a peice of context.  Acceptability is based on conditions:
         - Appropriate pause length (has to be shorter than the preceeding context turn (avoid total overlap))
-        - shouldn't be from the same speaker in the conversation
+        - Shouldn't be from the same speaker in the conversation
+        - Shouldn't be the true upcoming turn!
         
         Args:
             context_turn ():

@@ -124,6 +124,7 @@ def make_bertfp_stimuli_df(n_samples, n_responses, reverse,
     # Select some random context indices
     all_idxs = list(range(len(dataset.acceptable_context_turns)))
     if len(idxs_to_ignore) > 0:
+        print(f'ignoring indexes: {idxs_to_ignore}')
         all_idxs = list(set(all_idxs).difference(set(idxs_to_ignore)))
     np.random.seed(sample_seed)
     idxs = np.random.choice(all_idxs, n_samples, replace=False)
